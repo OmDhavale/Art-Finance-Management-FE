@@ -1,0 +1,65 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../api/api';
+
+const AuthContext = createContext(null);
+
+export const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
+    const [token, setToken] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    // Restore session on app start
+    useEffect(() => {
+        const restoreSession = async () => {
+            try {
+                const savedToken = await AsyncStorage.getItem('token');
+                const savedUser = await AsyncStorage.getItem('user');
+                if (savedToken && savedUser) {
+                    setToken(savedToken);
+                    setUser(JSON.parse(savedUser));
+                }
+            } catch (e) {
+                console.error('Session restore error:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        restoreSession();
+    }, []);
+
+    const login = async (phone, password) => {
+        const response = await api.post('/auth/login', { phone, password });
+        const { token: t, user: u } = response.data;
+        await AsyncStorage.setItem('token', t);
+        await AsyncStorage.setItem('user', JSON.stringify(u));
+        setToken(t);
+        setUser(u);
+        return response.data;
+    };
+
+    const register = async (fields) => {
+        const response = await api.post('/auth/register', fields);
+        const { token: t, user: u } = response.data;
+        await AsyncStorage.setItem('token', t);
+        await AsyncStorage.setItem('user', JSON.stringify(u));
+        setToken(t);
+        setUser(u);
+        return response.data;
+    };
+
+    const logout = async () => {
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, token, loading, login, logout, register }}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
+export const useAuth = () => useContext(AuthContext);
