@@ -78,6 +78,7 @@ export default function MyBookingsScreen({ navigation }) {
                                 key={booking._id}
                                 booking={booking}
                                 onPress={() => navigation.navigate('MandalDetails', { mandalId: booking.mandalId?._id })}
+                                onPressAddPayment={(id) => navigation.navigate('AddPayment', { bookingId: id })}
                             />
                         ))}
                     </View>
@@ -87,7 +88,7 @@ export default function MyBookingsScreen({ navigation }) {
     );
 }
 
-function BookingCard({ booking, onPress }) {
+function BookingCard({ booking, onPress, onPressAddPayment }) {
     const scale = useRef(new Animated.Value(1)).current;
     const onIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
     const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
@@ -111,8 +112,16 @@ function BookingCard({ booking, onPress }) {
                     </View>
                 </View>
                 <View style={styles.cardFooter}>
-                    <FinRow label="Final" value={`₹${(booking.finalPrice || 0).toLocaleString()}`} />
-                    <FinRow label="Paid" value={`₹${(booking.totalPaid || 0).toLocaleString()}`} />
+                    <View style={styles.footerInfo}>
+                        <FinRow label="Final" value={`₹${(booking.finalPrice || 0).toLocaleString()}`} />
+                        <FinRow label="Paid" value={`₹${(booking.totalPaid || 0).toLocaleString()}`} />
+                    </View>
+                    <TouchableOpacity
+                        style={styles.addPayBtn}
+                        onPress={() => onPressAddPayment(booking._id)}
+                    >
+                        <Text style={styles.addPayText}>+ Add Payment</Text>
+                    </TouchableOpacity>
                 </View>
             </Animated.View>
         </TouchableOpacity>
@@ -157,8 +166,14 @@ const styles = StyleSheet.create({
     remaining: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
     remainingLabel: { fontSize: Font.xs, color: Colors.textMuted },
 
-    cardFooter: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.separator },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.separator },
+    footerInfo: { flexDirection: 'row', gap: Spacing.lg },
     finRow: {},
     finLabel: { fontSize: Font.xs, color: Colors.textMuted, marginBottom: 2 },
     finValue: { fontSize: Font.sm, color: Colors.textSecondary, fontWeight: '600' },
+    addPayBtn: {
+        borderWidth: 1, borderColor: Colors.accent, borderRadius: Radius.sm,
+        paddingHorizontal: 12, paddingVertical: 6,
+    },
+    addPayText: { color: Colors.accent, fontSize: Font.xs, fontWeight: '700' },
 });

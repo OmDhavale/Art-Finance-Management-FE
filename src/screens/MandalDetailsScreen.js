@@ -7,9 +7,11 @@ import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
 import { toast } from '../utils/toast';
+import { useAuth } from '../context/AuthContext';
 
 export default function MandalDetailsScreen({ route, navigation }) {
     const { mandalId } = route.params;
+    const { user } = useAuth();
     const [mandal, setMandal] = useState(null);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -43,6 +45,8 @@ export default function MandalDetailsScreen({ route, navigation }) {
 
     const renderBooking = ({ item }) => {
         const cfg = gradeConfig[item.grade] || gradeConfig.red;
+        const isMyBooking = item.vendorId?._id === user?._id;
+
         return (
             <View style={styles.bookingCard}>
                 <View style={styles.bookingHeader}>
@@ -58,12 +62,14 @@ export default function MandalDetailsScreen({ route, navigation }) {
                 <Row label="Total Paid" value={`₹${(item.totalPaid || 0).toLocaleString()}`} />
                 <Row label="Remaining" value={`₹${(item.remainingAmount || 0).toLocaleString()}`} valueColor={cfg.color} bold />
 
-                <TouchableOpacity
-                    style={styles.addPayBtn}
-                    onPress={() => navigation.navigate('AddPayment', { bookingId: item._id })}
-                >
-                    <Text style={styles.addPayText}>+ Add Payment</Text>
-                </TouchableOpacity>
+                {isMyBooking && (
+                    <TouchableOpacity
+                        style={styles.addPayBtn}
+                        onPress={() => navigation.navigate('AddPayment', { bookingId: item._id })}
+                    >
+                        <Text style={styles.addPayText}>+ Add Payment</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         );
     };
