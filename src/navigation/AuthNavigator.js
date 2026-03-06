@@ -7,15 +7,9 @@ const Stack = createNativeStackNavigator();
 
 export default function AuthNavigator() {
     return (
-        <Stack.Navigator
-            screenOptions={{
-                headerStyle: { backgroundColor: '#FF6B35' },
-                headerTintColor: '#fff',
-                headerTitleStyle: { fontWeight: 'bold' },
-            }}
-        >
-            <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Sign In' }} />
-            <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create Account' }} />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
         </Stack.Navigator>
     );
 }

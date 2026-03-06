@@ -5,23 +5,23 @@ import BookMandalScreen from '../screens/BookMandalScreen';
 import MandalSearchScreen from '../screens/MandalSearchScreen';
 import MandalDetailsScreen from '../screens/MandalDetailsScreen';
 import AddPaymentScreen from '../screens/AddPaymentScreen';
+import RegisterMandalScreen from '../screens/RegisterMandalScreen';
+import AddManagerScreen from '../screens/AddManagerScreen';
+import MyBookingsScreen from '../screens/MyBookingsScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
     return (
-        <Stack.Navigator
-            screenOptions={{
-                headerStyle: { backgroundColor: '#FF6B35' },
-                headerTintColor: '#fff',
-                headerTitleStyle: { fontWeight: 'bold' },
-            }}
-        >
-            <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: '🙏 Ganesh Mandal' }} />
-            <Stack.Screen name="BookMandal" component={BookMandalScreen} options={{ title: 'Book Mandal' }} />
-            <Stack.Screen name="SearchMandal" component={MandalSearchScreen} options={{ title: 'Search Mandal' }} />
-            <Stack.Screen name="MandalDetails" component={MandalDetailsScreen} options={{ title: 'Mandal Details' }} />
-            <Stack.Screen name="AddPayment" component={AddPaymentScreen} options={{ title: 'Add Payment' }} />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+            <Stack.Screen name="AddManager" component={AddManagerScreen} />
+            <Stack.Screen name="RegisterMandal" component={RegisterMandalScreen} />
+            <Stack.Screen name="BookMandal" component={BookMandalScreen} />
+            <Stack.Screen name="MyBookings" component={MyBookingsScreen} />
+            <Stack.Screen name="SearchMandal" component={MandalSearchScreen} />
+            <Stack.Screen name="MandalDetails" component={MandalDetailsScreen} />
+            <Stack.Screen name="AddPayment" component={AddPaymentScreen} />
         </Stack.Navigator>
     );
 }

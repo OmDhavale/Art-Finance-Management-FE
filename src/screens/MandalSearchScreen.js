@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    FlatList,
-    StyleSheet,
-    ActivityIndicator,
-    Alert,
+    View, Text, StyleSheet, FlatList, TouchableOpacity,
+    ActivityIndicator, StatusBar,
 } from 'react-native';
 import api from '../api/api';
-import MandalCard from '../components/MandalCard';
+import ScreenHeader from '../components/ScreenHeader';
+import InputField from '../components/InputField';
+import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
 
 export default function MandalSearchScreen({ navigation }) {
     const [query, setQuery] = useState('');
@@ -19,18 +15,13 @@ export default function MandalSearchScreen({ navigation }) {
     const [searched, setSearched] = useState(false);
 
     const handleSearch = async () => {
-        if (!query.trim()) {
-            Alert.alert('Error', 'Please enter a search term.');
-            return;
-        }
+        if (!query.trim()) return;
         setLoading(true);
         setSearched(true);
         try {
             const res = await api.get(`/mandals/search?q=${encodeURIComponent(query.trim())}`);
             setResults(res.data.data || []);
-        } catch (err) {
-            const msg = err?.response?.data?.message || 'Search failed.';
-            Alert.alert('Error', msg);
+        } catch {
             setResults([]);
         } finally {
             setLoading(false);
@@ -38,78 +29,99 @@ export default function MandalSearchScreen({ navigation }) {
     };
 
     return (
-        <View style={styles.container} importantForAccessibility="yes">
-            <View style={styles.searchBar}>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Search by title, name, or area..."
-                    placeholderTextColor="#aaa"
-                    value={query}
-                    onChangeText={setQuery}
-                    onSubmitEditing={handleSearch}
-                    returnKeyType="search"
-                    accessibilityLabel="Search mandals"
-                />
+        <View style={styles.flex} importantForAccessibility="yes">
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+            <ScreenHeader title="Search Mandal" onBack={() => navigation.goBack()} />
+            <View style={styles.searchRow}>
+                <View style={styles.searchInputWrap}>
+                    <InputField
+                        value={query}
+                        onChangeText={setQuery}
+                        placeholder="Search by title, name, or area..."
+                        style={styles.searchInput}
+                    />
+                </View>
                 <TouchableOpacity
-                    style={styles.searchButton}
+                    style={styles.searchBtn}
                     onPress={handleSearch}
-                    accessible={true}
-                    accessibilityLabel="Search"
+                    accessible
                     accessibilityRole="button"
+                    accessibilityLabel="Search"
                 >
-                    <Text style={styles.searchButtonText}>🔍</Text>
+                    {loading
+                        ? <ActivityIndicator color={Colors.bg} size="small" />
+                        : <Text style={styles.searchBtnText}>Search</Text>
+                    }
                 </TouchableOpacity>
             </View>
 
-            {loading ? (
-                <ActivityIndicator size="large" color="#FF6B35" style={styles.loader} />
-            ) : (
-                <FlatList
-                    data={results}
-                    keyExtractor={(item) => item._id}
-                    renderItem={({ item }) => (
-                        <MandalCard
-                            mandal={item}
+            <FlatList
+                data={results}
+                keyExtractor={item => item._id}
+                contentContainerStyle={styles.list}
+                ListEmptyComponent={
+                    <View style={styles.empty}>
+                        <Text style={styles.emptyText}>
+                            {searched ? 'No mandals found.' : 'Search mandals by Ganpati title, mandal name, or area'}
+                        </Text>
+                    </View>
+                }
+                renderItem={({ item }) => {
+                    const cfg = item.latestGrade ? gradeConfig[item.latestGrade] : null;
+                    return (
+                        <TouchableOpacity
+                            style={styles.card}
                             onPress={() => navigation.navigate('MandalDetails', { mandalId: item._id })}
-                        />
-                    )}
-                    ListEmptyComponent={
-                        searched ? (
-                            <View style={styles.empty}>
-                                <Text style={styles.emptyIcon}>🙏</Text>
-                                <Text style={styles.emptyText}>No mandals found</Text>
+                            activeOpacity={0.75}
+                        >
+                            <View style={styles.cardInfo}>
+                                <Text style={styles.cardTitle}>{item.ganpatiTitle}</Text>
+                                <Text style={styles.cardSub}>{item.mandalName}</Text>
+                                <Text style={styles.cardLoc}>
+                                    {[item.area, item.city].filter(Boolean).join(', ') || 'Location not specified'}
+                                </Text>
                             </View>
-                        ) : (
-                            <View style={styles.hint}>
-                                <Text style={styles.hintText}>Search mandals by Ganpati title, mandal name, or area</Text>
+                            <View style={styles.cardRight}>
+                                {cfg && (
+                                    <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
+                                        <Text style={[styles.pillText, { color: cfg.color }]}>{cfg.label}</Text>
+                                    </View>
+                                )}
+                                <Text style={styles.arrow}>›</Text>
                             </View>
-                        )
-                    }
-                    contentContainerStyle={styles.list}
-                />
-            )}
+                        </TouchableOpacity>
+                    );
+                }}
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFF8F5' },
-    searchBar: { flexDirection: 'row', padding: 16, gap: 10 },
-    input: {
-        flex: 1, borderWidth: 1, borderColor: '#E0E0E0',
-        borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-        fontSize: 15, color: '#333', backgroundColor: '#fff',
+    flex: { flex: 1, backgroundColor: Colors.bg },
+    searchRow: { flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.sm, gap: 10, alignItems: 'flex-end' },
+    searchInputWrap: { flex: 1 },
+    searchInput: { marginBottom: 0 },
+    searchBtn: {
+        backgroundColor: Colors.accent, borderRadius: Radius.sm,
+        paddingVertical: 13, paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center',
     },
-    searchButton: {
-        backgroundColor: '#FF6B35', borderRadius: 12,
-        paddingHorizontal: 16, justifyContent: 'center',
+    searchBtnText: { color: Colors.bg, fontWeight: '700', fontSize: Font.sm },
+    list: { paddingHorizontal: Spacing.lg, paddingBottom: 24 },
+    empty: { marginTop: 48, alignItems: 'center', paddingHorizontal: Spacing.xl },
+    emptyText: { color: Colors.textMuted, fontSize: Font.sm, textAlign: 'center', lineHeight: 22 },
+    card: {
+        backgroundColor: Colors.card, borderRadius: Radius.md,
+        padding: Spacing.lg, marginBottom: Spacing.sm,
+        borderWidth: 1, borderColor: Colors.cardBorder,
+        flexDirection: 'row', alignItems: 'center',
     },
-    searchButtonText: { fontSize: 20 },
-    list: { paddingHorizontal: 16, paddingBottom: 20 },
-    loader: { marginTop: 40 },
-    empty: { marginTop: 60, alignItems: 'center' },
-    emptyIcon: { fontSize: 48, marginBottom: 8 },
-    emptyText: { fontSize: 16, color: '#888' },
-    hint: { marginTop: 60, alignItems: 'center', paddingHorizontal: 40 },
-    hintText: { fontSize: 14, color: '#aaa', textAlign: 'center', lineHeight: 22 },
+    cardInfo: { flex: 1 },
+    cardTitle: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
+    cardSub: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2 },
+    cardLoc: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 },
+    cardRight: { alignItems: 'flex-end', gap: 6, marginLeft: Spacing.sm },
+    pill: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 3 },
+    pillText: { fontSize: Font.xs, fontWeight: '700' },
+    arrow: { fontSize: 22, color: Colors.textMuted },
 });

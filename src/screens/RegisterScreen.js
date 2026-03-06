@@ -1,128 +1,102 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    StyleSheet,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    ActivityIndicator,
+    View, Text, TouchableOpacity, StyleSheet,
+    KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import InputField from '../components/InputField';
+import PrimaryButton from '../components/PrimaryButton';
+import { Colors, Font, Radius, Spacing } from '../theme';
+import { toast } from '../utils/toast';
+
+const FIELDS = [
+    { key: 'name', label: 'Full Name', placeholder: 'Your full name', keyboard: 'default', secure: false },
+    { key: 'workshopName', label: 'Workshop Name', placeholder: 'Workshop or business name', keyboard: 'default', secure: false },
+    { key: 'phone', label: 'Phone Number', placeholder: '10-digit phone', keyboard: 'phone-pad', secure: false },
+    { key: 'password', label: 'Password', placeholder: 'Create a strong password', keyboard: 'default', secure: true },
+    { key: 'area', label: 'Area (optional)', placeholder: 'Area / locality', keyboard: 'default', secure: false },
+    { key: 'city', label: 'City (optional)', placeholder: 'City', keyboard: 'default', secure: false },
+];
 
 export default function RegisterScreen({ navigation }) {
     const { register } = useAuth();
-    const [form, setForm] = useState({
-        name: '',
-        workshopName: '',
-        phone: '',
-        password: '',
-        area: '',
-        city: '',
-    });
+    const [form, setForm] = useState({ name: '', workshopName: '', phone: '', password: '', area: '', city: '' });
     const [loading, setLoading] = useState(false);
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(24)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ]).start();
+    }, []);
 
     const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
     const handleRegister = async () => {
         const { name, workshopName, phone, password } = form;
         if (!name || !workshopName || !phone || !password) {
-            Alert.alert('Error', 'Name, workshop name, phone, and password are required.');
+            toast.error('Name, workshop name, phone, and password are required.');
             return;
         }
         setLoading(true);
         try {
             await register(form);
         } catch (err) {
-            const msg = err?.response?.data?.message || 'Registration failed.';
-            Alert.alert('Registration Failed', msg);
+            toast.error(err?.response?.data?.message || 'Registration failed.', 'Registration Failed');
         } finally {
             setLoading(false);
         }
     };
 
-    const fields = [
-        { key: 'name', label: 'Full Name', placeholder: 'Your full name' },
-        { key: 'workshopName', label: 'Workshop Name', placeholder: 'Workshop / business name' },
-        { key: 'phone', label: 'Phone Number', placeholder: '10-digit phone', keyboard: 'phone-pad' },
-        { key: 'password', label: 'Password', placeholder: 'Create a password', secure: true },
-        { key: 'area', label: 'Area', placeholder: 'Area / locality (optional)' },
-        { key: 'city', label: 'City', placeholder: 'City (optional)' },
-    ];
-
     return (
-        <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <ScrollView contentContainerStyle={styles.container}>
-                <View style={styles.card}>
-                    {fields.map(({ key, label, placeholder, keyboard, secure }) => (
-                        <View key={key}>
-                            <Text style={styles.label}>{label}</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder={placeholder}
-                                placeholderTextColor="#aaa"
-                                value={form[key]}
-                                onChangeText={set(key)}
-                                keyboardType={keyboard || 'default'}
-                                secureTextEntry={!!secure}
-                                autoCapitalize={secure ? 'none' : 'words'}
-                            />
-                        </View>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+                <View style={styles.topRow}>
+                    <Text style={styles.heading}>Create Account</Text>
+                    <Text style={styles.sub}>Join as a Murtikar</Text>
+                </View>
+
+                <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                    {FIELDS.map(({ key, label, placeholder, keyboard, secure }) => (
+                        <InputField
+                            key={key}
+                            label={label}
+                            value={form[key]}
+                            onChangeText={set(key)}
+                            placeholder={placeholder}
+                            keyboardType={keyboard}
+                            secureTextEntry={secure}
+                            autoCapitalize={secure || keyboard === 'phone-pad' ? 'none' : 'words'}
+                        />
                     ))}
 
-                    <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.buttonText}>Create Account</Text>
-                        )}
-                    </TouchableOpacity>
+                    <PrimaryButton title="Create Account" onPress={handleRegister} loading={loading} style={styles.btn} />
 
-                    <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                        <Text style={styles.link}>Already have an account? Login</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.linkWrap}>
+                        <Text style={styles.link}>Already registered? <Text style={styles.linkBold}>Sign In</Text></Text>
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
             </ScrollView>
         </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
-    flex: { flex: 1, backgroundColor: '#FFF8F5' },
-    container: { flexGrow: 1, padding: 24, paddingTop: 32 },
+    flex: { flex: 1, backgroundColor: Colors.bg },
+    container: { padding: Spacing.xl, paddingTop: Spacing.xxl },
+    topRow: { marginBottom: Spacing.xl },
+    heading: { fontSize: Font.xxl, fontWeight: '800', color: Colors.textPrimary },
+    sub: { fontSize: Font.sm, color: Colors.textMuted, marginTop: 4 },
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 24,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
+        backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.xl,
+        borderWidth: 1, borderColor: Colors.cardBorder,
+        shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
     },
-    label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6, marginTop: 12 },
-    input: {
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 15,
-        color: '#333',
-        backgroundColor: '#FAFAFA',
-    },
-    button: {
-        backgroundColor: '#FF6B35',
-        borderRadius: 10,
-        paddingVertical: 14,
-        alignItems: 'center',
-        marginTop: 24,
-    },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-    link: { textAlign: 'center', color: '#FF6B35', marginTop: 16, fontSize: 14 },
+    btn: { marginTop: Spacing.sm },
+    linkWrap: { marginTop: Spacing.lg, alignItems: 'center' },
+    link: { color: Colors.textSecondary, fontSize: Font.sm },
+    linkBold: { color: Colors.accent, fontWeight: '700' },
 });

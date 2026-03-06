@@ -1,32 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    StyleSheet,
-    ActivityIndicator,
-    Alert,
-    TouchableOpacity,
-    ScrollView,
+    View, Text, StyleSheet, FlatList, TouchableOpacity,
+    ActivityIndicator, Animated, StatusBar,
 } from 'react-native';
 import api from '../api/api';
-
-const GRADE_COLORS = {
-    green: { bg: '#E8F5E9', text: '#2E7D32', label: '✅ Fully Paid' },
-    yellow: { bg: '#FFF9C4', text: '#F9A825', label: '⚡ Almost Done' },
-    orange: { bg: '#FFF3E0', text: '#E65100', label: '🔶 Partial' },
-    red: { bg: '#FFEBEE', text: '#C62828', label: '🔴 Due' },
-};
+import ScreenHeader from '../components/ScreenHeader';
+import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
+import { toast } from '../utils/toast';
 
 export default function MandalDetailsScreen({ route, navigation }) {
     const { mandalId } = route.params;
     const [mandal, setMandal] = useState(null);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-        fetchDetails();
-    }, []);
+    useEffect(() => { fetchDetails(); }, []);
 
     const fetchDetails = async () => {
         setLoading(true);
@@ -34,8 +23,9 @@ export default function MandalDetailsScreen({ route, navigation }) {
             const res = await api.get(`/mandals/${mandalId}`);
             setMandal(res.data.data.mandal);
             setBookings(res.data.data.bookingHistory || []);
-        } catch (err) {
-            Alert.alert('Error', 'Failed to load mandal details.');
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        } catch {
+            toast.error('Failed to load mandal details.');
         } finally {
             setLoading(false);
         }
@@ -43,142 +33,134 @@ export default function MandalDetailsScreen({ route, navigation }) {
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color="#FF6B35" />
-            </View>
-        );
-    }
-
-    if (!mandal) {
-        return (
-            <View style={styles.center}>
-                <Text style={styles.errorText}>Mandal not found.</Text>
+            <View style={styles.flex}>
+                <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+                <ScreenHeader title="Mandal Details" onBack={() => navigation.goBack()} />
+                <View style={styles.center}><ActivityIndicator color={Colors.accent} size="large" /></View>
             </View>
         );
     }
 
     const renderBooking = ({ item }) => {
-        const grade = GRADE_COLORS[item.grade] || GRADE_COLORS.red;
+        const cfg = gradeConfig[item.grade] || gradeConfig.red;
         return (
             <View style={styles.bookingCard}>
                 <View style={styles.bookingHeader}>
                     <Text style={styles.bookingYear}>{item.year}</Text>
-                    <View style={[styles.gradeBadge, { backgroundColor: grade.bg }]}>
-                        <Text style={[styles.gradeText, { color: grade.text }]}>{grade.label}</Text>
+                    <View style={[styles.gradePill, { backgroundColor: cfg.bg }]}>
+                        <Text style={[styles.gradeText, { color: cfg.color }]}>{cfg.label}</Text>
                     </View>
                 </View>
-
-                <View style={styles.bookingRow}>
-                    <Text style={styles.bookingLabel}>Vendor</Text>
-                    <Text style={styles.bookingValue}>
-                        {item.vendorId?.name || 'N/A'} ({item.vendorId?.workshopName || '—'})
-                    </Text>
-                </View>
-                <View style={styles.bookingRow}>
-                    <Text style={styles.bookingLabel}>Murti Size</Text>
-                    <Text style={styles.bookingValue}>{item.murtiSize || '—'}</Text>
-                </View>
-                <View style={styles.bookingRow}>
-                    <Text style={styles.bookingLabel}>Final Price</Text>
-                    <Text style={styles.bookingValue}>₹{item.finalPrice?.toLocaleString() || 0}</Text>
-                </View>
-                <View style={styles.bookingRow}>
-                    <Text style={styles.bookingLabel}>Total Paid</Text>
-                    <Text style={styles.bookingValue}>₹{item.totalPaid?.toLocaleString() || 0}</Text>
-                </View>
-                <View style={styles.bookingRow}>
-                    <Text style={styles.bookingLabel}>Remaining</Text>
-                    <Text style={[styles.bookingValue, { color: grade.text, fontWeight: '700' }]}>
-                        ₹{item.remainingAmount?.toLocaleString() || 0}
-                    </Text>
-                </View>
+                <View style={styles.separator} />
+                <Row label="Vendor" value={`${item.vendorId?.name || 'N/A'} · ${item.vendorId?.workshopName || '—'}`} />
+                <Row label="Murti Size" value={item.murtiSize || '—'} />
+                <Row label="Final Price" value={`₹${(item.finalPrice || 0).toLocaleString()}`} />
+                <Row label="Total Paid" value={`₹${(item.totalPaid || 0).toLocaleString()}`} />
+                <Row label="Remaining" value={`₹${(item.remainingAmount || 0).toLocaleString()}`} valueColor={cfg.color} bold />
 
                 <TouchableOpacity
-                    style={styles.paymentButton}
+                    style={styles.addPayBtn}
                     onPress={() => navigation.navigate('AddPayment', { bookingId: item._id })}
                 >
-                    <Text style={styles.paymentButtonText}>+ Add Payment</Text>
+                    <Text style={styles.addPayText}>+ Add Payment</Text>
                 </TouchableOpacity>
             </View>
         );
     };
 
     return (
-        <FlatList
-            style={styles.container}
-            ListHeaderComponent={
-                <View>
-                    {/* Mandal Info */}
-                    <View style={styles.mandalCard}>
-                        <Text style={styles.mandalEmoji}>🙏</Text>
-                        <Text style={styles.ganpatiTitle}>{mandal.ganpatiTitle}</Text>
-                        <Text style={styles.mandalName}>{mandal.mandalName}</Text>
-                        <Text style={styles.mandalLocation}>
-                            {[mandal.area, mandal.city].filter(Boolean).join(', ')}
-                        </Text>
-                    </View>
+        <View style={styles.flex}>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+            <ScreenHeader title="Mandal Details" onBack={() => navigation.goBack()} />
+            <Animated.View style={[styles.flex, { opacity: fadeAnim }]}>
+                <FlatList
+                    style={styles.flex}
+                    ListHeaderComponent={
+                        <View>
+                            <View style={styles.mandalBanner}>
+                                <View style={styles.bannerMonogram}>
+                                    <Text style={styles.bannerMonoText}>
+                                        {(mandal?.ganpatiTitle || 'M').charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                                <Text style={styles.ganpatiTitle}>{mandal?.ganpatiTitle}</Text>
+                                <Text style={styles.mandalName}>{mandal?.mandalName}</Text>
+                                {(mandal?.area || mandal?.city) ? (
+                                    <Text style={styles.mandalLocation}>
+                                        {[mandal.area, mandal.city].filter(Boolean).join(', ')}
+                                    </Text>
+                                ) : null}
+                            </View>
+                            <Text style={styles.sectionHeading}>BOOKING HISTORY</Text>
+                        </View>
+                    }
+                    data={bookings}
+                    keyExtractor={item => item._id}
+                    renderItem={renderBooking}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Text style={styles.emptyText}>No bookings for this mandal yet.</Text>
+                        </View>
+                    }
+                    contentContainerStyle={styles.listContent}
+                />
+            </Animated.View>
+        </View>
+    );
+}
 
-                    <Text style={styles.sectionHeading}>Booking History</Text>
-                </View>
-            }
-            data={bookings}
-            keyExtractor={(item) => item._id}
-            renderItem={renderBooking}
-            ListEmptyComponent={
-                <View style={styles.empty}>
-                    <Text style={styles.emptyText}>No bookings yet for this mandal.</Text>
-                </View>
-            }
-            contentContainerStyle={styles.list}
-        />
+function Row({ label, value, valueColor, bold }) {
+    return (
+        <View style={styles.row}>
+            <Text style={styles.rowLabel}>{label}</Text>
+            <Text style={[styles.rowValue, valueColor && { color: valueColor }, bold && { fontWeight: '700' }]}>
+                {value}
+            </Text>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFF8F5' },
-    list: { padding: 16, paddingBottom: 32 },
+    flex: { flex: 1, backgroundColor: Colors.bg },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    errorText: { color: '#888', fontSize: 16 },
-    mandalCard: {
-        backgroundColor: '#FF6B35',
-        borderRadius: 16,
-        padding: 24,
-        alignItems: 'center',
-        marginBottom: 24,
-        shadowColor: '#FF6B35',
-        shadowOpacity: 0.35,
-        shadowRadius: 12,
-        elevation: 6,
+    listContent: { padding: Spacing.lg, paddingBottom: 40 },
+
+    mandalBanner: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
+        padding: Spacing.xl, alignItems: 'center', marginBottom: Spacing.xl,
+        borderWidth: 1, borderColor: Colors.cardBorder,
+        borderTopWidth: 3, borderTopColor: Colors.accent,
     },
-    mandalEmoji: { fontSize: 36, marginBottom: 6 },
-    ganpatiTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-    mandalName: { color: 'rgba(255,255,255,0.85)', fontSize: 15, marginTop: 4 },
-    mandalLocation: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 },
-    sectionHeading: {
-        fontSize: 17, fontWeight: '700', color: '#333', marginBottom: 12,
+    bannerMonogram: {
+        width: 60, height: 60, borderRadius: Radius.full,
+        backgroundColor: Colors.accentMuted, alignItems: 'center', justifyContent: 'center',
+        marginBottom: Spacing.md,
     },
+    bannerMonoText: { fontSize: Font.xxl, fontWeight: '800', color: Colors.accent },
+    ganpatiTitle: { fontSize: Font.xl, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+    mandalName: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
+    mandalLocation: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 4 },
+
+    sectionHeading: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.4, marginBottom: Spacing.md },
+
     bookingCard: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 16,
-        marginBottom: 14,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
+        padding: Spacing.lg, marginBottom: Spacing.md,
+        borderWidth: 1, borderColor: Colors.cardBorder,
     },
-    bookingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    bookingYear: { fontSize: 20, fontWeight: 'bold', color: '#333' },
-    gradeBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-    gradeText: { fontSize: 12, fontWeight: '700' },
-    bookingRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-    bookingLabel: { fontSize: 13, color: '#888' },
-    bookingValue: { fontSize: 13, color: '#333', fontWeight: '500' },
-    paymentButton: {
-        marginTop: 12, backgroundColor: '#FF6B35',
-        borderRadius: 10, paddingVertical: 10, alignItems: 'center',
+    bookingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+    bookingYear: { fontSize: Font.xl, fontWeight: '800', color: Colors.textPrimary },
+    gradePill: { borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
+    gradeText: { fontSize: Font.xs, fontWeight: '700' },
+    separator: { height: 1, backgroundColor: Colors.separator, marginBottom: Spacing.md },
+    row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
+    rowLabel: { fontSize: Font.sm, color: Colors.textMuted },
+    rowValue: { fontSize: Font.sm, color: Colors.textSecondary, fontWeight: '500', maxWidth: '60%', textAlign: 'right' },
+    addPayBtn: {
+        marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.accent,
+        borderRadius: Radius.sm, paddingVertical: 10, alignItems: 'center',
     },
-    paymentButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    addPayText: { color: Colors.accent, fontWeight: '700', fontSize: Font.sm },
     empty: { alignItems: 'center', marginTop: 30 },
-    emptyText: { color: '#aaa', fontSize: 14 },
+    emptyText: { color: Colors.textMuted, fontSize: Font.sm },
 });

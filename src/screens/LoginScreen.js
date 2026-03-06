@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    StyleSheet,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    ActivityIndicator,
+    View, Text, TouchableOpacity, StyleSheet,
+    KeyboardAvoidingView, Platform, ScrollView,
+    Animated, StatusBar,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import InputField from '../components/InputField';
+import PrimaryButton from '../components/PrimaryButton';
+import { Colors, Font, Radius, Spacing } from '../theme';
+import { useState } from 'react';
+import { toast } from '../utils/toast';
 
 export default function LoginScreen({ navigation }) {
     const { login } = useAuth();
@@ -19,17 +17,26 @@ export default function LoginScreen({ navigation }) {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ]).start();
+    }, []);
+
     const handleLogin = async () => {
         if (!phone.trim() || !password.trim()) {
-            Alert.alert('Error', 'Please enter phone and password.');
+            toast.error('Please enter phone and password.');
             return;
         }
         setLoading(true);
         try {
             await login(phone.trim(), password);
         } catch (err) {
-            const msg = err?.response?.data?.message || 'Login failed. Please try again.';
-            Alert.alert('Login Failed', msg);
+            toast.error(err?.response?.data?.message || 'Login failed. Please try again.', 'Login Failed');
         } finally {
             setLoading(false);
         }
@@ -40,86 +47,78 @@ export default function LoginScreen({ navigation }) {
             style={styles.flex}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <ScrollView contentContainerStyle={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.emoji}>🙏</Text>
-                    <Text style={styles.title}>Ganesh Mandal</Text>
-                    <Text style={styles.subtitle}>Finance Tracker</Text>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+
+                <View style={styles.banner}>
+                    <View style={styles.monogram}>
+                        <Text style={styles.monogramText}>GM</Text>
+                    </View>
+                    <Text style={styles.appName}>Ganesh Mandal</Text>
+                    <Text style={styles.appSub}>Finance Tracker</Text>
                 </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.label}>Phone Number</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter your phone"
-                        placeholderTextColor="#aaa"
+                <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                    <Text style={styles.cardTitle}>Sign In</Text>
+
+                    <InputField
+                        label="Phone Number"
                         value={phone}
                         onChangeText={setPhone}
+                        placeholder="Enter your phone"
                         keyboardType="phone-pad"
                         autoCapitalize="none"
                     />
-
-                    <Text style={styles.label}>Password</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter your password"
-                        placeholderTextColor="#aaa"
+                    <InputField
+                        label="Password"
                         value={password}
                         onChangeText={setPassword}
+                        placeholder="Enter your password"
                         secureTextEntry
+                        autoCapitalize="none"
                     />
 
-                    <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.buttonText}>Login</Text>
-                        )}
-                    </TouchableOpacity>
+                    <PrimaryButton
+                        title="Sign In"
+                        onPress={handleLogin}
+                        loading={loading}
+                        style={styles.btn}
+                    />
 
-                    <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                        <Text style={styles.link}>Don't have an account? Register</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkWrap}>
+                        <Text style={styles.link}>New here? <Text style={styles.linkBold}>Create an account</Text></Text>
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
+
             </ScrollView>
         </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
-    flex: { flex: 1, backgroundColor: '#FFF8F5' },
-    container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-    header: { alignItems: 'center', marginBottom: 32 },
-    emoji: { fontSize: 56, marginBottom: 8 },
-    title: { fontSize: 28, fontWeight: 'bold', color: '#FF6B35' },
-    subtitle: { fontSize: 14, color: '#888', marginTop: 4 },
+    flex: { flex: 1, backgroundColor: Colors.bg },
+    container: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
+    banner: { alignItems: 'center', marginBottom: Spacing.xxl },
+    monogram: {
+        width: 72, height: 72, borderRadius: Radius.full,
+        backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+        marginBottom: Spacing.md,
+        shadowColor: Colors.accent, shadowOpacity: 0.35, shadowRadius: 14, elevation: 8,
+    },
+    monogramText: { fontSize: Font.xl, fontWeight: '800', color: Colors.white, letterSpacing: 1 },
+    appName: { fontSize: Font.xxl, fontWeight: '800', color: Colors.textPrimary, letterSpacing: 0.5 },
+    appSub: { fontSize: Font.sm, color: Colors.textMuted, marginTop: 4, letterSpacing: 1 },
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 24,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
-    },
-    label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6, marginTop: 12 },
-    input: {
+        backgroundColor: Colors.card,
+        borderRadius: Radius.lg,
+        padding: Spacing.xl,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 15,
-        color: '#333',
-        backgroundColor: '#FAFAFA',
+        borderColor: Colors.cardBorder,
+        shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
     },
-    button: {
-        backgroundColor: '#FF6B35',
-        borderRadius: 10,
-        paddingVertical: 14,
-        alignItems: 'center',
-        marginTop: 24,
-    },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-    link: { textAlign: 'center', color: '#FF6B35', marginTop: 16, fontSize: 14 },
+    cardTitle: { fontSize: Font.xl, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.lg },
+    btn: { marginTop: Spacing.md },
+    linkWrap: { marginTop: Spacing.lg, alignItems: 'center' },
+    link: { color: Colors.textSecondary, fontSize: Font.sm },
+    linkBold: { color: Colors.accent, fontWeight: '700' },
 });

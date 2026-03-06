@@ -1,36 +1,37 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ActivityIndicator, View, StyleSheet, StatusBar } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import AppNavigator from './src/navigation/AppNavigator';
+import { Colors } from './src/theme';
+import { ToastProvider } from './src/utils/ToastProvider';
 
 function RootNavigator() {
   const { token, loading } = useAuth();
-
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#FF6B35" />
+        <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
   }
-
   return token ? <AppNavigator /> : <AuthNavigator />;
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF8F5' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
 });

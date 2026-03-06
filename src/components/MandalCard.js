@@ -1,46 +1,60 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
 
 export default function MandalCard({ mandal, onPress }) {
+    const scale = useRef(new Animated.Value(1)).current;
+    const onIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
+    const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
+
+    const cfg = mandal.latestGrade ? gradeConfig[mandal.latestGrade] : null;
+    const initial = (mandal.ganpatiTitle || 'M').charAt(0).toUpperCase();
+
     return (
-        <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-            <View style={styles.iconBox}>
-                <Text style={styles.icon}>🙏</Text>
-            </View>
-            <View style={styles.info}>
-                <Text style={styles.title} numberOfLines={1}>{mandal.ganpatiTitle}</Text>
-                <Text style={styles.name} numberOfLines={1}>{mandal.mandalName}</Text>
-                <Text style={styles.location} numberOfLines={1}>
-                    {[mandal.area, mandal.city].filter(Boolean).join(', ') || 'Location not specified'}
-                </Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
+        <TouchableOpacity onPress={onPress} onPressIn={onIn} onPressOut={onOut} activeOpacity={1}>
+            <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
+                <View style={styles.iconBox}>
+                    <Text style={styles.iconText}>{initial}</Text>
+                </View>
+                <View style={styles.info}>
+                    <Text style={styles.title} numberOfLines={1}>{mandal.ganpatiTitle}</Text>
+                    <Text style={styles.name} numberOfLines={1}>{mandal.mandalName}</Text>
+                    <Text style={styles.location} numberOfLines={1}>
+                        {[mandal.area, mandal.city].filter(Boolean).join(', ') || 'Location not specified'}
+                    </Text>
+                </View>
+                <View style={styles.right}>
+                    {cfg ? (
+                        <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
+                            <Text style={[styles.pillText, { color: cfg.color }]}>{cfg.label}</Text>
+                        </View>
+                    ) : null}
+                    <Text style={styles.arrow}>›</Text>
+                </View>
+            </Animated.View>
         </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: Colors.card, borderRadius: Radius.md,
+        padding: Spacing.lg, marginBottom: Spacing.sm,
+        borderWidth: 1, borderColor: Colors.cardBorder,
     },
     iconBox: {
-        width: 44, height: 44, borderRadius: 22,
-        backgroundColor: '#FFF0EB', alignItems: 'center', justifyContent: 'center',
-        marginRight: 12,
+        width: 44, height: 44, borderRadius: Radius.full,
+        backgroundColor: Colors.accentMuted, alignItems: 'center', justifyContent: 'center',
+        marginRight: Spacing.md,
     },
-    icon: { fontSize: 22 },
+    iconText: { fontSize: Font.lg, fontWeight: '900', color: Colors.accent },
     info: { flex: 1 },
-    title: { fontSize: 15, fontWeight: '700', color: '#333' },
-    name: { fontSize: 13, color: '#666', marginTop: 2 },
-    location: { fontSize: 12, color: '#aaa', marginTop: 2 },
-    arrow: { fontSize: 22, color: '#ccc', marginLeft: 8 },
+    title: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
+    name: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2 },
+    location: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 },
+    right: { alignItems: 'flex-end', gap: 6, marginLeft: Spacing.sm },
+    pill: { borderRadius: Radius.full, paddingHorizontal: 7, paddingVertical: 2 },
+    pillText: { fontSize: Font.xs, fontWeight: '700' },
+    arrow: { fontSize: 22, color: Colors.textMuted },
 });
