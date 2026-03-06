@@ -10,7 +10,8 @@ const DEV_MACHINE_IP = '172.16.5.114';
 const BASE_HOST = Platform.OS === 'android' ? DEV_MACHINE_IP : 'localhost';
 
 const api = axios.create({
-    baseURL: `http://${BASE_HOST}:5000/api`,
+    // baseURL: `http://${BASE_HOST}:5000/api`,
+    baseURL: `https://art-finance-management.onrender.com/`,
     headers: {
         'Content-Type': 'application/json',
     },
