@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import storage from '../utils/storage';
 import api from '../api/api';
+
 
 const AuthContext = createContext(null);
 
@@ -13,12 +14,13 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const restoreSession = async () => {
             try {
-                const savedToken = await AsyncStorage.getItem('token');
-                const savedUser = await AsyncStorage.getItem('user');
+                const savedToken = await storage.getItem('token');
+                const savedUser = await storage.getItem('user');
                 if (savedToken && savedUser) {
                     setToken(savedToken);
                     setUser(JSON.parse(savedUser));
                 }
+
             } catch (e) {
                 console.error('Session restore error:', e);
             } finally {
@@ -31,29 +33,32 @@ export const AuthProvider = ({ children }) => {
     const login = async (phone, password) => {
         const response = await api.post('/auth/login', { phone, password });
         const { token: t, user: u } = response.data;
-        await AsyncStorage.setItem('token', t);
-        await AsyncStorage.setItem('user', JSON.stringify(u));
+        await storage.setItem('token', t);
+        await storage.setItem('user', JSON.stringify(u));
         setToken(t);
         setUser(u);
         return response.data;
     };
+
 
     const register = async (fields) => {
         const response = await api.post('/auth/register', fields);
         const { token: t, user: u } = response.data;
-        await AsyncStorage.setItem('token', t);
-        await AsyncStorage.setItem('user', JSON.stringify(u));
+        await storage.setItem('token', t);
+        await storage.setItem('user', JSON.stringify(u));
         setToken(t);
         setUser(u);
         return response.data;
     };
 
+
     const logout = async () => {
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('user');
+        await storage.removeItem('token');
+        await storage.removeItem('user');
         setToken(null);
         setUser(null);
     };
+
 
     return (
         <AuthContext.Provider value={{ user, token, loading, login, logout, register }}>

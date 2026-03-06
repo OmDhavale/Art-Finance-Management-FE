@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, gradeConfig, getGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 
 const BOOKING_FIELDS = [
@@ -68,13 +68,13 @@ export default function BookMandalScreen({ navigation }) {
         try {
             await api.post('/bookings', {
                 mandalId: selectedMandal._id,
-                vendorId: user?._id,
                 year: Number(year),
                 murtiSize,
                 originalPrice: Number(originalPrice),
                 finalPrice: Number(finalPrice),
                 advancePaid: Number(booking.advancePaid) || 0,
             });
+
             toast.success('Booking created successfully.', 'Booked');
             setTimeout(() => navigation.navigate('Dashboard'), 1200);
         } catch (err) {
@@ -260,7 +260,10 @@ function MandalListCard({ mandal, expanded, onToggle, onBook }) {
                 <View style={styles.breakdown}>
                     <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
                     {mandal.bookingSummary.map((b, i) => {
-                        const gc = gradeConfig[b.grade] || gradeConfig.red;
+                        const gc = getGradeConfig(b.remainingAmount);
+                        const rawR = b.remainingAmount;
+                        const dispR = Math.max(0, rawR);
+                        const extra = rawR < 0 ? Math.abs(rawR) : 0;
                         return (
                             <View key={i} style={styles.breakdownRow}>
                                 <View style={styles.breakdownLeft}>
@@ -273,9 +276,12 @@ function MandalListCard({ mandal, expanded, onToggle, onBook }) {
                                         <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
                                     </View>
                                     <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                        ₹{b.remainingAmount.toLocaleString()}
+                                        ₹{dispR.toLocaleString()}
                                     </Text>
-                                    <Text style={styles.breakdownAmtLabel}>due</Text>
+                                    <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                    {extra > 0 && (
+                                        <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
+                                    )}
                                 </View>
                             </View>
                         );
@@ -357,6 +363,7 @@ const styles = StyleSheet.create({
     breakdownRight: { alignItems: 'flex-end' },
     breakdownAmt: { fontSize: Font.md, fontWeight: '700', marginTop: 2 },
     breakdownAmtLabel: { fontSize: Font.xs, color: Colors.textMuted },
+    breakdownExtra: { fontSize: 10, fontWeight: '700', color: '#1B5E20', marginTop: 1 },
     miniPill: { borderRadius: Radius.full, paddingHorizontal: 6, paddingVertical: 2 },
     miniPillText: { fontSize: 10, fontWeight: '700' },
     noHistory: { fontSize: Font.sm, color: Colors.textMuted, paddingBottom: Spacing.sm },

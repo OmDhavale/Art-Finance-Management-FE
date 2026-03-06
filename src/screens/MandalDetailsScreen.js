@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
-import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, getGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -44,7 +44,10 @@ export default function MandalDetailsScreen({ route, navigation }) {
     }
 
     const renderBooking = ({ item }) => {
-        const cfg = gradeConfig[item.grade] || gradeConfig.red;
+        const cfg = getGradeConfig(item.remainingAmount || 0);
+        const rawR = item.remainingAmount || 0;
+        const dispR = Math.max(0, rawR);
+        const extra = rawR < 0 ? Math.abs(rawR) : 0;
         const isMyBooking = item.vendorId?._id === user?._id;
 
         return (
@@ -60,7 +63,41 @@ export default function MandalDetailsScreen({ route, navigation }) {
                 <Row label="Murti Size" value={item.murtiSize || '—'} />
                 <Row label="Final Price" value={`₹${(item.finalPrice || 0).toLocaleString()}`} />
                 <Row label="Total Paid" value={`₹${(item.totalPaid || 0).toLocaleString()}`} />
-                <Row label="Remaining" value={`₹${(item.remainingAmount || 0).toLocaleString()}`} valueColor={cfg.color} bold />
+                <Row
+                    label={extra > 0 ? 'Remaining' : 'Remaining'}
+                    value={extra > 0 ? `₹0 (paid in full)` : `₹${dispR.toLocaleString()}`}
+                    valueColor={cfg.color}
+                    bold
+                />
+                {extra > 0 && (
+                    <Row label="Extra Paid" value={`+₹${extra.toLocaleString()}`} valueColor="#1B5E20" bold />
+                )}
+
+                {/* Price History */}
+                {item.priceHistory && item.priceHistory.length > 0 && (
+                    <>
+                        <View style={styles.separator} />
+                        <Text style={styles.priceHistoryTitle}>PRICE HISTORY</Text>
+                        {item.priceHistory.map((h, idx) => (
+                            <View key={idx} style={styles.priceHistoryRow}>
+                                <View style={styles.priceHistoryDot} />
+                                <View style={styles.priceHistoryContent}>
+                                    <Text style={styles.priceHistoryChange}>
+                                        ₹{(h.oldPrice || 0).toLocaleString()} → ₹{(h.newPrice || 0).toLocaleString()}
+                                    </Text>
+                                    {h.reason ? (
+                                        <Text style={styles.priceHistoryReason}>Reason: {h.reason}</Text>
+                                    ) : null}
+                                    {h.changedAt ? (
+                                        <Text style={styles.priceHistoryDate}>
+                                            {new Date(h.changedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            </View>
+                        ))}
+                    </>
+                )}
 
                 {isMyBooking && (
                     <TouchableOpacity
@@ -169,4 +206,19 @@ const styles = StyleSheet.create({
     addPayText: { color: Colors.accent, fontWeight: '700', fontSize: Font.sm },
     empty: { alignItems: 'center', marginTop: 30 },
     emptyText: { color: Colors.textMuted, fontSize: Font.sm },
+
+    // Price History
+    priceHistoryTitle: {
+        fontSize: Font.xs, fontWeight: '700', color: Colors.textMuted,
+        letterSpacing: 1.2, marginTop: Spacing.md, marginBottom: Spacing.sm,
+    },
+    priceHistoryRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: Spacing.sm },
+    priceHistoryDot: {
+        width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.accent,
+        marginTop: 5, marginRight: Spacing.sm,
+    },
+    priceHistoryContent: { flex: 1 },
+    priceHistoryChange: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
+    priceHistoryReason: { fontSize: Font.xs, color: Colors.textSecondary, marginTop: 1 },
+    priceHistoryDate: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 1 },
 });

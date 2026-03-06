@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView,
-    Animated, StatusBar,
+    Animated, StatusBar, Image,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import InputField from '../components/InputField';
@@ -51,9 +51,11 @@ export default function LoginScreen({ navigation }) {
             <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
                 <View style={styles.banner}>
-                    <View style={styles.monogram}>
-                        <Text style={styles.monogramText}>GM</Text>
-                    </View>
+                    <Image
+                        source={require('../../assets/ganesha_logo.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                    />
                     <Text style={styles.appName}>Ganesh Mandal</Text>
                     <Text style={styles.appSub}>Finance Tracker</Text>
                 </View>
@@ -99,13 +101,7 @@ const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
     container: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
     banner: { alignItems: 'center', marginBottom: Spacing.xxl },
-    monogram: {
-        width: 72, height: 72, borderRadius: Radius.full,
-        backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
-        marginBottom: Spacing.md,
-        shadowColor: Colors.accent, shadowOpacity: 0.35, shadowRadius: 14, elevation: 8,
-    },
-    monogramText: { fontSize: Font.xl, fontWeight: '800', color: Colors.white, letterSpacing: 1 },
+    logoImage: { width: 120, height: 120, marginBottom: Spacing.md },
     appName: { fontSize: Font.xxl, fontWeight: '800', color: Colors.textPrimary, letterSpacing: 0.5 },
     appSub: { fontSize: Font.sm, color: Colors.textMuted, marginTop: 4, letterSpacing: 1 },
     card: {

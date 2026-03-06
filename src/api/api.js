@@ -1,6 +1,7 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import storage from '../utils/storage';
 import { Platform } from 'react-native';
+
 
 // On Android, "localhost" refers to the device itself.
 // Use the dev machine's LAN IP instead.
@@ -18,12 +19,13 @@ const api = axios.create({
 // Attach token to every request if available
 api.interceptors.request.use(
     async (config) => {
-        const token = await AsyncStorage.getItem('token');
+        const token = await storage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
+
     (error) => Promise.reject(error)
 );
 
