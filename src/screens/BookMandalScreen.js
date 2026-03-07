@@ -4,12 +4,13 @@ import {
     ScrollView, KeyboardAvoidingView, Platform, Switch,
     Animated, StatusBar, ActivityIndicator, TextInput, RefreshControl,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Font, Radius, Spacing, gradeConfig, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, Shadow, gradeConfig, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 
 // Only advance paid comes from BOOKING_FIELDS now; prices are handled separately
@@ -427,7 +428,7 @@ export default function BookMandalScreen({ navigation }) {
                             <Text style={[
                                 styles.filterChipText,
                                 gradeFilter === key && { color: cfg.color, fontWeight: '800' },
-                            ]}>{cfg.label} — {cfg.fullLabel}</Text>
+                            ]}>{cfg.label}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -447,7 +448,7 @@ export default function BookMandalScreen({ navigation }) {
 
             {loading ? (
                 <View style={styles.center}>
-                    <ActivityIndicator color={Colors.accent} size="large" />
+                    <ActivityIndicator color={Colors.primary} size="large" />
                     <Text style={styles.loadingText}>Loading mandals...</Text>
                 </View>
             ) : (
@@ -460,8 +461,8 @@ export default function BookMandalScreen({ navigation }) {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={() => { setRefreshing(true); fetchMandals(true); }}
-                            colors={[Colors.accent]}
-                            tintColor={Colors.accent}
+                            colors={[Colors.primary]}
+                            tintColor={Colors.primary}
                         />
                     }
                     ListEmptyComponent={
@@ -469,6 +470,13 @@ export default function BookMandalScreen({ navigation }) {
                             <Text style={styles.emptyText}>
                                 {allMandals.length === 0 ? 'No mandals registered yet.' : 'No mandals match your search.'}
                             </Text>
+                            <TouchableOpacity
+                                style={styles.registerLink}
+                                onPress={() => navigation.navigate('RegisterMandal')}
+                            >
+                                <Feather name="plus-circle" size={16} color={Colors.primary} />
+                                <Text style={styles.registerLinkText}>Register New Mandal</Text>
+                            </TouchableOpacity>
                         </View>
                     }
                     renderItem={({ item }) => (
@@ -548,7 +556,7 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
                             <Text style={[styles.overallBadgeLabel, { color: ogCfg.color }]}>{ogCfg.fullLabel}</Text>
                         )}
                         <Text style={[styles.totalPending, isDisabled && { color: Colors.textMuted }]}>
-                            {isDisabled ? '—' : (mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'All clear')}
+                            {mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'All clear'}
                         </Text>
                     </View>
                 </View>
@@ -633,20 +641,20 @@ const styles = StyleSheet.create({
         borderWidth: 1.5, borderColor: Colors.inputBorder,
         backgroundColor: Colors.surface,
     },
-    filterChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+    filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
     filterChipText: { fontSize: Font.xs, fontWeight: '600', color: Colors.textSecondary },
     filterChipTextActive: { color: Colors.white },
 
     // Disabled card (already booked this year)
     cardDisabled: { opacity: 0.72 },
     bookedBanner: {
-        backgroundColor: '#E8F5E9', paddingHorizontal: Spacing.lg, paddingVertical: 6,
-        borderBottomWidth: 1, borderBottomColor: '#C8E6C9',
+        backgroundColor: '#D1FAE5', paddingHorizontal: Spacing.lg, paddingVertical: 6,
+        borderBottomWidth: 1, borderBottomColor: '#6EE7B7',
     },
-    bookedBannerText: { fontSize: Font.xs, fontWeight: '700', color: '#2E7D32' },
+    bookedBannerText: { fontSize: Font.xs, fontWeight: '700', color: '#065F46' },
     cardHeaderDisabled: { backgroundColor: '#FAFAFA' },
-    cardInitialDisabled: { backgroundColor: '#E0E0E0' },
-    cardInitialTextDisabled: { color: '#9E9E9E' },
+    cardInitialDisabled: { backgroundColor: '#E2E8F0' },
+    cardInitialTextDisabled: { color: '#94A3B8' },
     cardTitleDisabled: { color: Colors.textMuted },
     badgeDisabled: { opacity: 0.5 },
     badgeTextDisabled: {},
@@ -655,12 +663,12 @@ const styles = StyleSheet.create({
     searchWrap: {
         flexDirection: 'row', alignItems: 'center',
         marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs,
-        backgroundColor: Colors.inputBg, borderRadius: Radius.sm,
+        backgroundColor: Colors.inputBg, borderRadius: Radius.md,
         borderWidth: 1.5, borderColor: Colors.inputBorder,
-        paddingHorizontal: Spacing.md,
+        paddingHorizontal: Spacing.md, ...Shadow.sm,
     },
     searchInput: {
-        flex: 1, height: 44, fontSize: Font.sm,
+        flex: 1, height: 48, fontSize: Font.sm,
         color: Colors.textPrimary, paddingVertical: 0,
     },
     clearBtn: { paddingLeft: 8 },
@@ -670,7 +678,7 @@ const styles = StyleSheet.create({
     legendRow: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
         marginHorizontal: Spacing.lg, marginBottom: Spacing.sm,
-        backgroundColor: Colors.card, borderRadius: Radius.sm,
+        backgroundColor: Colors.card, borderRadius: Radius.md,
         borderWidth: 1, borderColor: Colors.cardBorder,
         paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm,
     },
@@ -688,16 +696,15 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: Colors.card, borderRadius: Radius.lg,
         marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder,
-        overflow: 'hidden',
-        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+        overflow: 'hidden', ...Shadow.sm,
     },
     cardHeader: { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg },
     cardInitial: {
         width: 46, height: 46, borderRadius: Radius.full,
-        backgroundColor: Colors.accentMuted, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center',
         marginRight: Spacing.md, flexShrink: 0,
     },
-    cardInitialText: { fontSize: Font.lg, fontWeight: '900', color: Colors.accent },
+    cardInitialText: { fontSize: Font.lg, fontWeight: '900', color: Colors.primary },
     cardInfo: { flex: 1, marginRight: Spacing.sm },
     cardTitle: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
     cardSub: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 1 },
@@ -718,7 +725,7 @@ const styles = StyleSheet.create({
     breakdown: {
         borderTopWidth: 1, borderTopColor: Colors.separator,
         paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm,
-        backgroundColor: '#FAFAF8',
+        backgroundColor: Colors.bg,
     },
     breakdownLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2, marginBottom: Spacing.sm },
     breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: Colors.separator },
@@ -729,24 +736,32 @@ const styles = StyleSheet.create({
     breakdownRight: { alignItems: 'flex-end' },
     breakdownAmt: { fontSize: Font.md, fontWeight: '700', marginTop: 2 },
     breakdownAmtLabel: { fontSize: Font.xs, color: Colors.textMuted },
-    breakdownExtra: { fontSize: 10, fontWeight: '700', color: '#1B5E20', marginTop: 1 },
+    breakdownExtra: { fontSize: 10, fontWeight: '700', color: '#065F46', marginTop: 1 },
     miniPill: { borderRadius: Radius.full, paddingHorizontal: 6, paddingVertical: 2 },
     miniPillText: { fontSize: 10, fontWeight: '700' },
     noHistory: { fontSize: Font.sm, color: Colors.textMuted, paddingBottom: Spacing.sm },
 
     bookBtn: {
-        backgroundColor: Colors.accent, marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
-        borderRadius: Radius.sm, paddingVertical: 13, alignItems: 'center',
+        backgroundColor: Colors.primary, marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
+        borderRadius: Radius.full, paddingVertical: 14, alignItems: 'center',
+        ...Shadow.sm,
     },
     bookBtnText: { color: Colors.white, fontWeight: '700', fontSize: Font.sm, letterSpacing: 0.5 },
 
-    // Step 2 — booking form styles
+    registerLink: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        marginTop: Spacing.lg, paddingVertical: 8, paddingHorizontal: 16,
+        backgroundColor: Colors.primaryMuted, borderRadius: Radius.full,
+    },
+    registerLinkText: { fontSize: Font.sm, fontWeight: '700', color: Colors.primary },
+
+    // Step 2 — New Booking form (matches "New Booking" mockup)
     formContainer: { padding: Spacing.xl },
+
+    // Section grouping card (Mandal Details / Murti & Pricing)
     selectedCard: {
         backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.lg,
-        marginBottom: Spacing.xl, borderWidth: 1, borderColor: Colors.cardBorder,
-        borderLeftWidth: 3, borderLeftColor: Colors.accent,
-        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+        marginBottom: Spacing.xl, borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
     },
     selectedLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2, marginBottom: 6 },
     selectedTitle: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
@@ -764,17 +779,16 @@ const styles = StyleSheet.create({
 
     historyCard: {
         backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.lg,
-        marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.cardBorder,
-        shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+        marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
     },
     historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
     historyLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2 },
     historySearch: {
         fontSize: Font.xs, color: Colors.textPrimary,
-        backgroundColor: Colors.inputBg, borderRadius: Radius.xs,
+        backgroundColor: Colors.inputBg, borderRadius: Radius.sm,
         paddingHorizontal: 8, paddingVertical: 4,
-        borderWidth: 1, borderColor: Colors.inputBorder,
-        width: 120, height: 30,
+        borderWidth: 1.5, borderColor: Colors.inputBorder,
+        width: 120, height: 32,
     },
     historyScroll: { maxHeight: 240 },
     historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.separator },
@@ -791,8 +805,8 @@ const styles = StyleSheet.create({
     // Negotiated Price toggle row
     toggleRow: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: Colors.card, borderRadius: Radius.sm,
-        borderWidth: 1, borderColor: Colors.cardBorder,
+        backgroundColor: Colors.card, borderRadius: Radius.md,
+        borderWidth: 1.5, borderColor: Colors.cardBorder,
         paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
         marginBottom: Spacing.md,
     },
@@ -804,7 +818,10 @@ const styles = StyleSheet.create({
     yearSection: { marginBottom: Spacing.xl },
     yearHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     yearLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2 },
-    bookedWarning: { fontSize: 10, fontWeight: '700', color: '#D32F2F', backgroundColor: '#FFEBEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    bookedWarning: {
+        fontSize: 10, fontWeight: '700', color: Colors.danger,
+        backgroundColor: Colors.dangerBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    },
     yearRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     yearChip: {
         flex: 1, minWidth: '10%',
@@ -812,19 +829,13 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.inputBorder,
         alignItems: 'center', justifyContent: 'center',
     },
-    yearChipSelected: {
-        backgroundColor: Colors.accent, borderColor: Colors.accent,
-    },
-    yearChipSelectedBooked: {
-        backgroundColor: '#D32F2F', borderColor: '#D32F2F',
-    },
-    yearChipBooked: {
-        backgroundColor: '#F5F5F5', borderColor: '#EEE', opacity: 0.6,
-    },
+    yearChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    yearChipSelectedBooked: { backgroundColor: Colors.danger, borderColor: Colors.danger },
+    yearChipBooked: { backgroundColor: Colors.bg, borderColor: Colors.separator, opacity: 0.6 },
     yearChipText: { fontSize: Font.md, fontWeight: '700', color: Colors.textSecondary },
     yearChipTextSelected: { color: Colors.white },
     yearChipTextBooked: { color: Colors.textMuted },
     yearChipNote: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', marginTop: 2, color: Colors.textMuted },
 
-    bookBtnNext: { backgroundColor: Colors.textPrimary, marginTop: -Spacing.xs },
+    bookBtnNext: { backgroundColor: Colors.textSecondary, marginTop: -Spacing.xs },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DashboardScreen from '../screens/DashboardScreen';
 import BookMandalScreen from '../screens/BookMandalScreen';
 import MandalSearchScreen from '../screens/MandalSearchScreen';
@@ -9,21 +9,28 @@ import RegisterMandalScreen from '../screens/RegisterMandalScreen';
 import AddManagerScreen from '../screens/AddManagerScreen';
 import MyBookingsScreen from '../screens/MyBookingsScreen';
 import PaymentLogsScreen from '../screens/PaymentLogsScreen';
+import BottomTab from '../components/BottomTab';
 
-const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 export default function AppNavigator() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Dashboard" component={DashboardScreen} />
-            <Stack.Screen name="AddManager" component={AddManagerScreen} />
-            <Stack.Screen name="RegisterMandal" component={RegisterMandalScreen} />
-            <Stack.Screen name="BookMandal" component={BookMandalScreen} />
-            <Stack.Screen name="MyBookings" component={MyBookingsScreen} />
-            <Stack.Screen name="SearchMandal" component={MandalSearchScreen} />
-            <Stack.Screen name="MandalDetails" component={MandalDetailsScreen} />
-            <Stack.Screen name="AddPayment" component={AddPaymentScreen} />
-            <Stack.Screen name="PaymentLogs" component={PaymentLogsScreen} />
-        </Stack.Navigator>
+        <Tab.Navigator
+            tabBar={props => <BottomTab {...props} />}
+            screenOptions={{ headerShown: false }}
+        >
+            {/* Primary Navigation Tabs */}
+            <Tab.Screen name="Dashboard" component={DashboardScreen} />
+            <Tab.Screen name="SearchMandal" component={MandalSearchScreen} />
+            <Tab.Screen name="BookMandal" component={BookMandalScreen} />
+            <Tab.Screen name="MyBookings" component={MyBookingsScreen} />
+
+            {/* Secondary Screens (Will be persistent but not in the main tab icons) */}
+            <Tab.Screen name="MandalDetails" component={MandalDetailsScreen} />
+            <Tab.Screen name="AddPayment" component={AddPaymentScreen} />
+            <Tab.Screen name="PaymentLogs" component={PaymentLogsScreen} />
+            <Tab.Screen name="RegisterMandal" component={RegisterMandalScreen} />
+            <Tab.Screen name="AddManager" component={AddManagerScreen} />
+        </Tab.Navigator>
     );
 }

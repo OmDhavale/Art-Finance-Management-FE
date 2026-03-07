@@ -1,263 +1,351 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
-    SafeAreaView, Animated, StatusBar, ScrollView,
+    SafeAreaView, Animated, StatusBar, ScrollView, Platform, RefreshControl,
+    ActivityIndicator, Image,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Colors, Font, Radius, Spacing } from '../theme';
+import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
+import api from '../api/api';
+import { toast } from '../utils/toast';
+import { formatDistanceToNow } from 'date-fns';
 
-// ── Professional geometric icon component ─────────────────────────────────────
-// Uses styled Views with initials/shapes — no emojis, no external deps
-function TileIcon({ shape, bg, color, letter }) {
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, iconName, tinted, style, footer }) {
     return (
-        <View style={[iconStyles.wrap, { backgroundColor: bg }]}>
-            {shape === 'circle' ? (
-                <View style={[iconStyles.circle, { borderColor: color }]} />
-            ) : shape === 'book' ? (
-                // Two stacked rectangles — represents a ledger/booking
-                <View>
-                    <View style={[iconStyles.bookLine, { backgroundColor: color }]} />
-                    <View style={[iconStyles.bookLine, { backgroundColor: color, opacity: 0.6, marginTop: 3 }]} />
-                    <View style={[iconStyles.bookLine, { backgroundColor: color, opacity: 0.35, marginTop: 3 }]} />
-                </View>
-            ) : shape === 'grid' ? (
-                // 2×2 squares — represents add/register
-                <View style={iconStyles.grid}>
-                    <View style={[iconStyles.dot, { backgroundColor: color }]} />
-                    <View style={[iconStyles.dot, { backgroundColor: color }]} />
-                    <View style={[iconStyles.dot, { backgroundColor: color }]} />
-                    <View style={[iconStyles.dot, { backgroundColor: color }]} />
-                </View>
-            ) : shape === 'person' ? (
-                // Circle head + bar body
-                <View style={iconStyles.person}>
-                    <View style={[iconStyles.personHead, { backgroundColor: color }]} />
-                    <View style={[iconStyles.personBody, { backgroundColor: color }]} />
-                </View>
-            ) : (
-                <Text style={[iconStyles.letter, { color }]}>{letter}</Text>
-            )}
+        <View style={[statStyles.card, tinted && statStyles.tinted, style]}>
+            <View style={statStyles.headerRow}>
+                <Feather name={iconName} size={14} color={tinted ? Colors.primary : Colors.textMuted} />
+                <Text style={statStyles.label}>{label}</Text>
+            </View>
+            <Text style={statStyles.value} numberOfLines={1}>{value}</Text>
+            {footer ? <Text style={statStyles.footer}>{footer}</Text> : null}
         </View>
     );
 }
 
-const iconStyles = StyleSheet.create({
-    wrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-    circle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2.5 },
-    bookLine: { height: 3, width: 22, borderRadius: 2 },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', width: 22, height: 22, gap: 3 },
-    dot: { width: 9, height: 9, borderRadius: 2.5 },
-    person: { alignItems: 'center' },
-    personHead: { width: 11, height: 11, borderRadius: 6, marginBottom: 3 },
-    personBody: { width: 18, height: 8, borderRadius: 4 },
-    letter: { fontSize: 18, fontWeight: '800' },
+const statStyles = StyleSheet.create({
+    card: {
+        flex: 1, backgroundColor: Colors.card, borderRadius: Radius.lg,
+        padding: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    tinted: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+    label: { fontSize: 10, color: Colors.textMuted, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+    value: { fontSize: Font.xl, fontWeight: '800', color: Colors.textPrimary },
+    footer: { fontSize: 10, color: Colors.textMuted, fontWeight: '600', marginTop: 2 },
 });
 
-// Primary actions → hero full-width cards
-const PRIMARY_ACTIONS = [
-    {
-        id: 'book-mandal',
-        title: 'Book Mandal',
-        sub: 'Search mandals by grade, view\npending history & create booking',
-        shape: 'circle',
-        iconBg: '#FFF0DC',
-        iconColor: Colors.accent,
-        route: 'BookMandal',
-    },
-    {
-        id: 'my-bookings',
-        title: 'My Bookings',
-        sub: 'Year-wise view of your bookings,\npayments due & entries',
-        shape: 'book',
-        iconBg: '#EAF4EC',
-        iconColor: '#2E7D32',
-        route: 'MyBookings',
-    },
-];
+// ── Activity Item ─────────────────────────────────────────────────────────────
+function ActivityItem({ activity }) {
+    const isPayment = activity.type === 'payment';
+    const timeAgo = formatDistanceToNow(new Date(activity.date), { addSuffix: true }).replace('about ', '');
 
-// Secondary actions → compact row tiles
-const SECONDARY_ACTIONS = [
-    {
-        id: 'register-mandal',
-        title: 'Register Mandal',
-        sub: 'Add new mandal',
-        shape: 'grid',
-        iconBg: '#EDE7F6',
-        iconColor: '#6A1B9A',
-        route: 'RegisterMandal',
-        ownerOnly: false,
+    return (
+        <View style={activityStyles.card}>
+            <View style={activityStyles.left}>
+                <View style={[activityStyles.iconCircle, { backgroundColor: isPayment ? '#ECFDF5' : '#EFF6FF' }]}>
+                    {isPayment ? (
+                        <Text style={{ fontSize: 22, color: '#059669', fontWeight: '800' }}>₹</Text>
+                    ) : (
+                        <Feather name="plus" size={20} color="#2563EB" />
+                    )}
+                </View>
+                <View style={activityStyles.info}>
+                    <Text style={activityStyles.title} numberOfLines={1}>{activity.title}</Text>
+                    <Text style={activityStyles.sub}>{activity.subtitle}</Text>
+                    <View style={activityStyles.timeRow}>
+                        <Feather name="clock" size={10} color={Colors.textMuted} />
+                        <Text style={activityStyles.timeText}>{timeAgo}</Text>
+                    </View>
+                </View>
+            </View>
+            <View style={activityStyles.right}>
+                <Text style={[activityStyles.amount, isPayment && activityStyles.amountPlus]}>
+                    {isPayment ? '+' : ''} ₹{activity.amount?.toLocaleString()}
+                </Text>
+                <View style={[activityStyles.tag, { backgroundColor: isPayment ? Colors.success + '10' : '#0284C710' }]}>
+                    <Text style={[activityStyles.tagText, { color: isPayment ? Colors.success : '#0284C7' }]}>
+                        {activity.type}
+                    </Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
+const activityStyles = StyleSheet.create({
+    card: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
+        padding: Spacing.md, marginBottom: Spacing.md,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
     },
-    {
-        id: 'add-manager',
-        title: 'Add Manager',
-        sub: 'Create account',
-        shape: 'person',
-        iconBg: '#E3F2FD',
-        iconColor: '#1565C0',
-        route: 'AddManager',
-        ownerOnly: true,
+    left: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    iconCircle: {
+        width: 44, height: 44, borderRadius: 22,
+        alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md,
     },
-];
+    info: { flex: 1 },
+    title: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
+    sub: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+    timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+    timeText: { fontSize: 10, color: Colors.textMuted, fontWeight: '600' },
+    right: { alignItems: 'flex-end', gap: 6 },
+    amount: { fontSize: Font.md, fontWeight: '800', color: Colors.textPrimary },
+    amountPlus: { color: Colors.textPrimary }, // User image shows dark text for payment amount in summary
+    tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+    tagText: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase' },
+});
 
 export default function DashboardScreen({ navigation }) {
     const { user, logout } = useAuth();
-    const isOwner = user?.role === 'owner';
-    const visibleSecondary = SECONDARY_ACTIONS.filter(a => !a.ownerOnly || isOwner);
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const headerFade = useRef(new Animated.Value(0)).current;
-    const primaryAnims = useRef(PRIMARY_ACTIONS.map(() => new Animated.Value(0))).current;
-    const secondaryAnims = useRef(SECONDARY_ACTIONS.map(() => new Animated.Value(0))).current;
+    const contentFade = useRef(new Animated.Value(0)).current;
+
+    const fetchStats = async (isRefresh = false) => {
+        if (!isRefresh) setLoading(true);
+        try {
+            const res = await api.get('/bookings/stats');
+            setStats(res.data.data);
+            if (!isRefresh) {
+                Animated.stagger(100, [
+                    Animated.timing(headerFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+                    Animated.timing(contentFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+                ]).start();
+            }
+        } catch (error) {
+            toast.error('Failed to load dashboard stats.');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
-        Animated.timing(headerFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-        [...PRIMARY_ACTIONS, ...SECONDARY_ACTIONS].forEach((_, i) => {
-            const anim = i < PRIMARY_ACTIONS.length
-                ? primaryAnims[i]
-                : secondaryAnims[i - PRIMARY_ACTIONS.length];
-            Animated.timing(anim, {
-                toValue: 1, duration: 380, delay: 150 + i * 90, useNativeDriver: true,
-            }).start();
-        });
+        fetchStats();
+    }, []);
+
+    const onRefresh = React.useCallback(() => {
+        setRefreshing(true);
+        fetchStats(true);
     }, []);
 
     return (
         <SafeAreaView style={styles.safe}>
-            <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
-            <ScrollView contentContainerStyle={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
 
-                {/* ── Header ── */}
-                <Animated.View style={[styles.header, { opacity: headerFade }]}>
-                    <View>
-                        <Text style={styles.greeting}>Welcome back</Text>
-                        <Text style={styles.userName}>{user?.name || 'Murtikar'}</Text>
-                        {user?.workshopName ? (
-                            <Text style={styles.workshop}>{user.workshopName}</Text>
-                        ) : null}
-                    </View>
-                    <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-                        <Text style={styles.logoutText}>Sign Out</Text>
-                    </TouchableOpacity>
+            {/* Top Header */}
+            <View style={styles.topBar}>
+                <View style={styles.logoChip}>
+                    <Image
+                        source={require('../../assets/ganesha_logo.png')}
+                        style={styles.logoImageSmall}
+                        resizeMode="contain"
+                    />
+                </View>
+                <Text style={styles.workshopName} numberOfLines={1}>{user?.workshopName || 'My Workshop'}</Text>
+                <TouchableOpacity onPress={logout} style={styles.signOutBtn}>
+                    <Feather name="log-out" size={17} color={Colors.primary} />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView
+                contentContainerStyle={styles.container}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} tintColor={Colors.primary} />
+                }
+            >
+                {/* Greeting */}
+                <Animated.View style={[styles.greeting, { opacity: headerFade }]}>
+                    <Text style={styles.greetText}>Namaste, {user?.name?.split(' ')[0] || 'Murtikar'}!</Text>
+                    <Text style={styles.greetSub}>Your workshop summary for this season</Text>
                 </Animated.View>
 
-                <View style={styles.divider} />
+                {loading && !refreshing ? (
+                    <View style={styles.loaderWrap}>
+                        <ActivityIndicator color={Colors.primary} size="large" />
+                    </View>
+                ) : (
+                    <Animated.View style={{ opacity: contentFade }}>
 
-                {/* ── Primary Hero Tiles ── */}
-                <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
-                {PRIMARY_ACTIONS.map((action, i) => (
-                    <Animated.View
-                        key={action.id}
-                        style={{
-                            opacity: primaryAnims[i],
-                            transform: [{
-                                translateY: primaryAnims[i].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }),
-                            }],
-                        }}
-                    >
-                        <HeroTile action={action} onPress={() => navigation.navigate(action.route)} />
-                    </Animated.View>
-                ))}
-
-                {/* ── Secondary compact row ── */}
-                {visibleSecondary.length > 0 && (
-                    <>
-                        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl }]}>MORE OPTIONS</Text>
-                        <View style={styles.secondaryRow}>
-                            {visibleSecondary.map((action, i) => (
-                                <Animated.View key={action.id} style={[styles.secondaryWrap, { opacity: secondaryAnims[i] }]}>
-                                    <SecondaryTile action={action} onPress={() => navigation.navigate(action.route)} />
-                                </Animated.View>
-                            ))}
+                        {/* Financial Status */}
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionLabel}>FINANCIAL STATUS</Text>
                         </View>
-                    </>
+                        <View style={styles.statRow}>
+                            <StatCard
+                                label="Active Mandals"
+                                value={stats?.activeMandals ?? '—'}
+                                iconName="users"
+                                footer="Current year"
+                            />
+                            <View style={styles.gap} />
+                            <StatCard
+                                label="Pending"
+                                value={stats?.totalPending ? `₹${stats.totalPending.toLocaleString()}` : (stats?.totalPending === 0 ? '₹0' : '—')}
+                                iconName="clock"
+                                tinted
+                                footer={stats?.dueMandals > 0 ? `${stats.dueMandals} due mandals` : 'No dues'}
+                            />
+                        </View>
+
+
+
+                        {/* Quick Actions */}
+                        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>QUICK ACTIONS</Text>
+
+                        {/* Main Row — Prioritized actions */}
+                        <View style={styles.quickGrid}>
+                            <TouchableOpacity
+                                style={styles.mainTilePrimary}
+                                onPress={() => navigation.navigate('BookMandal')}
+                                activeOpacity={0.85}
+                            >
+                                <View style={styles.iconCircleWhite}>
+                                    <Feather name="plus" size={24} color={Colors.primary} />
+                                </View>
+                                <Text style={styles.mainTileLabelWhite}>Book New{'\n'}Mandal</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.mainTileSecondary}
+                                onPress={() => navigation.navigate('MyBookings')}
+                                activeOpacity={0.85}
+                            >
+                                <View style={styles.iconCircleBlue}>
+                                    <Feather name="book-open" size={24} color="#0284C7" />
+                                </View>
+                                <Text style={styles.mainTileLabelBlue}>My All{'\n'}Bookings</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.secondaryActionRow}
+                            onPress={() => navigation.navigate('RegisterMandal')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.secondaryIconWrap}>
+                                <Feather name="edit-3" size={18} color={Colors.primary} />
+                            </View>
+                            <View style={styles.secondaryTextWrap}>
+                                <Text style={styles.secondaryActionTitle}>Register New Mandal</Text>
+                                <Text style={styles.secondaryActionSub}>Add a new mandal to the system</Text>
+                            </View>
+                            <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+                        </TouchableOpacity>
+                        {/* Recent Activity */}
+                        <View style={[styles.sectionHeader, { marginTop: Spacing.xl }]}>
+                            <Text style={styles.sectionLabel}>RECENT ACTIVITY</Text>
+                            <View style={styles.timeFilter}>
+                                <Text style={styles.timeFilterText}>Last 10 entries</Text>
+                            </View>
+                        </View>
+
+                        {stats?.recentActivity?.length > 0 ? (
+                            stats.recentActivity.map(act => (
+                                <ActivityItem key={act._id + act.type} activity={act} />
+                            ))
+                        ) : (
+                            <View style={styles.emptyCard}>
+                                <Text style={styles.emptyText}>No recent activity mixed with current year data.</Text>
+                            </View>
+                        )}
+                    </Animated.View>
                 )}
             </ScrollView>
         </SafeAreaView>
     );
 }
 
-function HeroTile({ action, onPress }) {
-    const scale = useRef(new Animated.Value(1)).current;
-    const onIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
-    const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
-
-    return (
-        <TouchableOpacity onPress={onPress} onPressIn={onIn} onPressOut={onOut} activeOpacity={1}>
-            <Animated.View style={[styles.heroTile, { transform: [{ scale }] }]}>
-                <TileIcon shape={action.shape} bg={action.iconBg} color={action.iconColor} />
-                <View style={styles.heroContent}>
-                    <Text style={styles.heroTitle}>{action.title}</Text>
-                    <Text style={styles.heroSub}>{action.sub}</Text>
-                </View>
-                {/* Chevron arrow */}
-                <Text style={styles.arrow}>›</Text>
-            </Animated.View>
-        </TouchableOpacity>
-    );
-}
-
-function SecondaryTile({ action, onPress }) {
-    const scale = useRef(new Animated.Value(1)).current;
-    const onIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40 }).start();
-    const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
-
-    return (
-        <TouchableOpacity onPress={onPress} onPressIn={onIn} onPressOut={onOut} activeOpacity={1}>
-            <Animated.View style={[styles.secondaryTile, { transform: [{ scale }] }]}>
-                <TileIcon shape={action.shape} bg={action.iconBg} color={action.iconColor} />
-                <Text style={styles.secondaryTitle}>{action.title}</Text>
-                <Text style={styles.secondarySub}>{action.sub}</Text>
-            </Animated.View>
-        </TouchableOpacity>
-    );
-}
-
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.bg },
-    container: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: 48 },
-
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.xl },
-    greeting: { fontSize: Font.sm, color: Colors.textSecondary, letterSpacing: 0.4 },
-    userName: { fontSize: Font.xxl, fontWeight: '800', color: Colors.textPrimary, marginTop: 2 },
-    workshop: { fontSize: Font.sm, color: Colors.accent, marginTop: 3, fontWeight: '600' },
-
-    logoutBtn: {
-        paddingHorizontal: Spacing.md, paddingVertical: 7,
-        borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.cardBorder,
-        marginLeft: Spacing.md, marginTop: 4,
+    container: {
+        paddingHorizontal: Spacing.lg,
+        paddingTop: Platform.OS === 'ios' ? Spacing.lg : Spacing.xxl,
+        paddingBottom: 40
     },
-    logoutText: { fontSize: Font.xs, color: Colors.textSecondary, fontWeight: '600' },
+    loaderWrap: { height: 300, justifyContent: 'center', alignItems: 'center' },
 
-    divider: { height: 1, backgroundColor: Colors.separator, marginBottom: Spacing.xl },
-    sectionLabel: {
-        fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700',
-        letterSpacing: 1.5, marginBottom: Spacing.md,
-    },
-
-    // Hero tiles — full width horizontal card
-    heroTile: {
-        backgroundColor: Colors.card, borderRadius: Radius.lg,
-        borderWidth: 1, borderColor: Colors.cardBorder,
+    topBar: {
         flexDirection: 'row', alignItems: 'center',
-        paddingVertical: Spacing.lg, paddingHorizontal: Spacing.lg,
-        marginBottom: Spacing.md,
-        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+        backgroundColor: Colors.surface,
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: 12,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 12,
+        borderBottomWidth: 1, borderBottomColor: Colors.separator, ...Shadow.sm,
     },
-    heroContent: { flex: 1, marginLeft: Spacing.md },
-    heroTitle: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
-    heroSub: { fontSize: Font.xs, color: Colors.textSecondary, marginTop: 3, lineHeight: 17 },
-
-    // Chevron arrow
-    arrow: { fontSize: 26, color: Colors.textMuted, marginLeft: Spacing.sm },
-
-    // Secondary tiles — compact horizontal row
-    secondaryRow: { flexDirection: 'row', gap: Spacing.md },
-    secondaryWrap: { flex: 1 },
-    secondaryTile: {
-        backgroundColor: Colors.card, borderRadius: Radius.lg,
+    logoChip: {
+        width: 38, height: 38, borderRadius: 10,
+        backgroundColor: Colors.white,
+        alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
         borderWidth: 1, borderColor: Colors.cardBorder,
-        padding: Spacing.md, alignItems: 'flex-start',
-        shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
     },
-    secondaryTitle: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary, marginTop: Spacing.sm },
-    secondarySub: { fontSize: Font.xs, color: Colors.textSecondary, marginTop: 2, lineHeight: 15 },
+    logoImageSmall: { width: 28, height: 28 },
+    workshopName: { flex: 1, fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
+    signOutBtn: {
+        width: 34, height: 34, borderRadius: 17,
+        backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center',
+    },
+
+    greeting: { paddingTop: Spacing.xl, marginBottom: Spacing.lg },
+    greetText: { fontSize: Font.xxl, fontWeight: '800', color: Colors.textPrimary },
+    greetSub: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 4 },
+
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+    sectionLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
+
+    timeFilter: { backgroundColor: Colors.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: Colors.separator },
+    timeFilterText: { fontSize: 9, fontWeight: '700', color: Colors.textSecondary },
+
+    statRow: { flexDirection: 'row', marginBottom: Spacing.md },
+    gap: { width: Spacing.md },
+
+    quickGrid: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },
+    mainTilePrimary: {
+        flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.lg,
+        padding: Spacing.lg, height: 140, justifyContent: 'space-between', ...Shadow.md,
+    },
+    iconCircleWhite: {
+        width: 46, height: 46, borderRadius: 23,
+        backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
+    },
+    mainTileLabelWhite: { fontSize: Font.md, fontWeight: '800', color: Colors.white, lineHeight: 22 },
+
+    mainTileSecondary: {
+        flex: 1, backgroundColor: '#E0F2FE', borderRadius: Radius.lg,
+        padding: Spacing.lg, height: 140, justifyContent: 'space-between',
+        borderWidth: 1, borderColor: '#BAE6FD', ...Shadow.sm,
+    },
+    iconCircleBlue: {
+        width: 46, height: 46, borderRadius: 23,
+        backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: '#7DD3FC',
+    },
+    mainTileLabelBlue: { fontSize: Font.md, fontWeight: '800', color: '#0369A1', lineHeight: 22 },
+
+    secondaryActionRow: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
+        flexDirection: 'row', alignItems: 'center',
+        padding: Spacing.md, paddingVertical: 14,
+        borderWidth: 1, borderColor: Colors.cardBorder,
+        ...Shadow.sm, marginTop: Spacing.xs,
+    },
+    secondaryIconWrap: {
+        width: 38, height: 38, borderRadius: 10,
+        backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center',
+        marginRight: Spacing.md,
+    },
+    secondaryTextWrap: { flex: 1 },
+    secondaryActionTitle: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
+    secondaryActionSub: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 },
+
+    emptyCard: { padding: Spacing.xl, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white, borderRadius: Radius.lg, borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.separator },
+    emptyText: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '600' },
 });

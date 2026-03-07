@@ -1,28 +1,45 @@
-// Design tokens — Art Finance Management (Light Theme)
+// Design tokens — Art Finance Management (Visily Design System)
 export const Colors = {
-    bg: '#F7F4F0',
-    surface: '#FFFFFF',
-    card: '#FFFFFF',
-    cardBorder: '#EDE9E3',
-    accent: '#C9893A',
-    accentLight: '#E8B060',
-    accentMuted: 'rgba(201,137,58,0.10)',
-    textPrimary: '#1A1410',
-    textSecondary: '#6B6057',
-    textMuted: '#A89E95',
-    success: '#2E8A5E',
-    successBg: 'rgba(46,138,94,0.10)',
-    warning: '#B8861A',
-    warningBg: 'rgba(184,134,26,0.12)',
-    orange: '#C4611A',
-    orangeBg: 'rgba(196,97,26,0.10)',
-    danger: '#C43A3A',
-    dangerBg: 'rgba(196,58,58,0.10)',
+    // Core palette — warm orange brand
+    primary: '#F97316',          // Vibrant orange (primary brand)
+    primaryLight: '#FDBA74',     // Soft orange / tint
+    primaryMuted: 'rgba(249,115,22,0.12)', // Orange translucent
+    primaryDark: '#EA6A00',      // Deeper orange for active/pressed states
+
+    // Background system
+    bg: '#F1F5F9',               // Cool off-white page background
+    surface: '#FFFFFF',          // Pure white surfaces
+    card: '#FFFFFF',             // Card background
+    cardBorder: '#E2E8F0',       // Subtle card border
+
+    // Text
+    textPrimary: '#0F172A',      // Near-black
+    textSecondary: '#475569',    // Medium grey
+    textMuted: '#94A3B8',        // Light grey hint text
+
+    // Semantic
+    success: '#16A34A',
+    successBg: 'rgba(22,163,74,0.10)',
+    warning: '#D97706',
+    warningBg: 'rgba(217,119,6,0.12)',
+    orange: '#EA580C',
+    orangeBg: 'rgba(234,88,12,0.10)',
+    danger: '#DC2626',
+    dangerBg: 'rgba(220,38,38,0.10)',
+
+    // Inputs
     inputBg: '#FFFFFF',
-    inputBorder: '#DDD9D3',
-    inputFocus: '#C9893A',
-    separator: '#EDE9E3',
+    inputBorder: '#CBD5E1',
+    inputFocus: '#F97316',
+
+    // Misc
+    separator: '#E2E8F0',
     white: '#FFFFFF',
+
+    // Aliases for backward compat
+    accent: '#F97316',
+    accentLight: '#FDBA74',
+    accentMuted: 'rgba(249,115,22,0.12)',
 };
 
 export const Spacing = {
@@ -30,15 +47,26 @@ export const Spacing = {
 };
 
 export const Radius = {
-    sm: 8, md: 12, lg: 16, xl: 24, full: 999,
+    xs: 4, sm: 8, md: 12, lg: 16, xl: 24, full: 999,
 };
 
 export const Font = {
     xs: 11, sm: 13, md: 15, lg: 17, xl: 20, xxl: 26, xxxl: 34,
 };
 
+export const Shadow = {
+    sm: {
+        shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    },
+    md: {
+        shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 }, elevation: 4,
+    },
+};
+
 export const gradeConfig = {
-    excellent: { color: '#1B5E20', bg: '#C8E6C9', label: 'Excellent' },
+    excellent: { color: '#15803D', bg: '#DCFCE7', label: 'Fully Paid' },
     green: { color: Colors.success, bg: Colors.successBg, label: 'Fully Paid' },
     yellow: { color: Colors.warning, bg: Colors.warningBg, label: 'Almost Done' },
     orange: { color: Colors.orange, bg: Colors.orangeBg, label: 'Partial' },
@@ -56,20 +84,13 @@ export const getGradeConfig = (remainingAmount) => {
 
 /**
  * Overall mandal-level grade config (O / A / B / C / D).
- *
- * Grade is computed from the cumulative netPending across ALL bookings for a mandal:
- *   O → netPending < 0   (overpaid the murtikar — outstanding!)
- *   A → netPending = 0   (fully cleared — excellent)
- *   B → 1 – 4,999        (good payer)
- *   C → 5,000 – 49,999   (average payer)
- *   D → ≥ 50,000         (poor payer — large dues)
  */
 export const overallGradeConfig = {
-    O: { label: 'O', fullLabel: 'Outstanding', color: '#1B5E20', bg: '#C8E6C9', borderColor: '#4CAF50' },
-    A: { label: 'A', fullLabel: 'Excellent', color: '#2E7D32', bg: '#DCEDC8', borderColor: '#8BC34A' },
-    B: { label: 'B', fullLabel: 'Good', color: '#F57F17', bg: '#FFF9C4', borderColor: '#FBC02D' },
-    C: { label: 'C', fullLabel: 'Average', color: '#E65100', bg: '#FFE0B2', borderColor: '#FF9800' },
-    D: { label: 'D', fullLabel: 'Poor', color: '#B71C1C', bg: '#FFCDD2', borderColor: '#F44336' },
+    O: { label: 'O', fullLabel: 'Outstanding', color: '#15803D', bg: '#DCFCE7', borderColor: '#4ADE80' },
+    A: { label: 'A', fullLabel: 'Excellent', color: '#16A34A', bg: '#D1FAE5', borderColor: '#6EE7B7' },
+    B: { label: 'B', fullLabel: 'Good', color: '#B45309', bg: '#FEF9C3', borderColor: '#FDE047' },
+    C: { label: 'C', fullLabel: 'Average', color: '#EA580C', bg: '#FFEDD5', borderColor: '#FB923C' },
+    D: { label: 'D', fullLabel: 'Poor', color: '#DC2626', bg: '#FEE2E2', borderColor: '#F87171' },
 };
 
 /** Returns the overallGradeConfig entry for a given grade letter, or null if ungraded. */
