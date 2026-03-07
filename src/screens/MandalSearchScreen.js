@@ -54,7 +54,7 @@ export default function MandalSearchScreen({ navigation }) {
     return (
         <View style={styles.flex}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-            <ScreenHeader title="Mandal Directory" onBack={() => navigation.goBack()} />
+            <ScreenHeader title="Search Mandal" onBack={() => navigation.goBack()} />
 
             {/* Search bar */}
             <View style={styles.searchWrap}>
