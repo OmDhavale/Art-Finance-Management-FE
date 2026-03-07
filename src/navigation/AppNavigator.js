@@ -8,6 +8,7 @@ import AddPaymentScreen from '../screens/AddPaymentScreen';
 import RegisterMandalScreen from '../screens/RegisterMandalScreen';
 import AddManagerScreen from '../screens/AddManagerScreen';
 import MyBookingsScreen from '../screens/MyBookingsScreen';
+import PaymentLogsScreen from '../screens/PaymentLogsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,6 +23,7 @@ export default function AppNavigator() {
             <Stack.Screen name="SearchMandal" component={MandalSearchScreen} />
             <Stack.Screen name="MandalDetails" component={MandalDetailsScreen} />
             <Stack.Screen name="AddPayment" component={AddPaymentScreen} />
+            <Stack.Screen name="PaymentLogs" component={PaymentLogsScreen} />
         </Stack.Navigator>
     );
 }

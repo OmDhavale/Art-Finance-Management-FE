@@ -6,7 +6,7 @@ export default function InputField({
     label, value, onChangeText, placeholder,
     secureTextEntry = false, keyboardType = 'default',
     autoCapitalize = 'sentences', multiline = false, editable = true,
-    style,
+    style, onFocus, onBlur,
 }) {
     const [focused, setFocused] = useState(false);
 
@@ -24,8 +24,8 @@ export default function InputField({
                 autoCapitalize={autoCapitalize}
                 multiline={multiline}
                 editable={editable}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
+                onFocus={() => { setFocused(true); onFocus?.(); }}
+                onBlur={() => { setFocused(false); onBlur?.(); }}
             />
         </View>
     );

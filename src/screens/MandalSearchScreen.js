@@ -6,7 +6,7 @@ import {
 import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
-import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, getOverallGradeConfig } from '../theme';
 
 export default function MandalSearchScreen({ navigation }) {
     const [query, setQuery] = useState('');
@@ -67,7 +67,7 @@ export default function MandalSearchScreen({ navigation }) {
                     </View>
                 }
                 renderItem={({ item }) => {
-                    const cfg = item.latestGrade ? gradeConfig[item.latestGrade] : null;
+                    const ogCfg = item.overallGrade ? getOverallGradeConfig(item.overallGrade) : null;
                     return (
                         <TouchableOpacity
                             style={styles.card}
@@ -82,9 +82,13 @@ export default function MandalSearchScreen({ navigation }) {
                                 </Text>
                             </View>
                             <View style={styles.cardRight}>
-                                {cfg && (
-                                    <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
-                                        <Text style={[styles.pillText, { color: cfg.color }]}>{cfg.label}</Text>
+                                {ogCfg ? (
+                                    <View style={[styles.gradeBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
+                                        <Text style={[styles.gradeBadgeText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
+                                    </View>
+                                ) : (
+                                    <View style={[styles.gradeBadge, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
+                                        <Text style={[styles.gradeBadgeText, { color: Colors.textMuted }]}>–</Text>
                                     </View>
                                 )}
                                 <Text style={styles.arrow}>›</Text>
@@ -121,7 +125,11 @@ const styles = StyleSheet.create({
     cardSub: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2 },
     cardLoc: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 },
     cardRight: { alignItems: 'flex-end', gap: 6, marginLeft: Spacing.sm },
-    pill: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 3 },
-    pillText: { fontSize: Font.xs, fontWeight: '700' },
+    gradeBadge: {
+        width: 32, height: 32, borderRadius: 16,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 2,
+    },
+    gradeBadgeText: { fontSize: Font.md, fontWeight: '900' },
     arrow: { fontSize: 22, color: Colors.textMuted },
 });

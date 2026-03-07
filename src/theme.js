@@ -53,3 +53,24 @@ export const getGradeConfig = (remainingAmount) => {
     if (remainingAmount < 50000) return gradeConfig.orange;
     return gradeConfig.red;
 };
+
+/**
+ * Overall mandal-level grade config (O / A / B / C / D).
+ *
+ * Grade is computed from the cumulative netPending across ALL bookings for a mandal:
+ *   O → netPending < 0   (overpaid the murtikar — outstanding!)
+ *   A → netPending = 0   (fully cleared — excellent)
+ *   B → 1 – 4,999        (good payer)
+ *   C → 5,000 – 49,999   (average payer)
+ *   D → ≥ 50,000         (poor payer — large dues)
+ */
+export const overallGradeConfig = {
+    O: { label: 'O', fullLabel: 'Outstanding', color: '#1B5E20', bg: '#C8E6C9', borderColor: '#4CAF50' },
+    A: { label: 'A', fullLabel: 'Excellent', color: '#2E7D32', bg: '#DCEDC8', borderColor: '#8BC34A' },
+    B: { label: 'B', fullLabel: 'Good', color: '#F57F17', bg: '#FFF9C4', borderColor: '#FBC02D' },
+    C: { label: 'C', fullLabel: 'Average', color: '#E65100', bg: '#FFE0B2', borderColor: '#FF9800' },
+    D: { label: 'D', fullLabel: 'Poor', color: '#B71C1C', bg: '#FFCDD2', borderColor: '#F44336' },
+};
+
+/** Returns the overallGradeConfig entry for a given grade letter, or null if ungraded. */
+export const getOverallGradeConfig = (grade) => overallGradeConfig[grade] || null;

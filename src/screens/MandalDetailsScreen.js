@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
-import { Colors, Font, Radius, Spacing, getGradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, getGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -48,7 +48,10 @@ export default function MandalDetailsScreen({ route, navigation }) {
         const rawR = item.remainingAmount || 0;
         const dispR = Math.max(0, rawR);
         const extra = rawR < 0 ? Math.abs(rawR) : 0;
-        const isMyBooking = item.vendorId?._id === user?._id;
+
+        // Is this booking belonging to the current user's workshop/account?
+        const isMyBooking = item.vendorId?._id === user?._id ||
+            (user?.role === 'manager' && item.vendorId?._id === user?.ownerId);
 
         return (
             <View style={styles.bookingCard}>
@@ -61,20 +64,47 @@ export default function MandalDetailsScreen({ route, navigation }) {
                 <View style={styles.separator} />
                 <Row label="Vendor" value={`${item.vendorId?.name || 'N/A'} · ${item.vendorId?.workshopName || '—'}`} />
                 <Row label="Murti Size" value={item.murtiSize || '—'} />
-                <Row label="Final Price" value={`₹${(item.finalPrice || 0).toLocaleString()}`} />
-                <Row label="Total Paid" value={`₹${(item.totalPaid || 0).toLocaleString()}`} />
+                {isMyBooking && (
+                    <>
+                        <Row label="Final Price" value={`₹${(item.finalPrice || 0).toLocaleString()}`} />
+                        <Row label="Total Paid" value={`₹${(item.totalPaid || 0).toLocaleString()}`} />
+                    </>
+                )}
                 <Row
-                    label={extra > 0 ? 'Remaining' : 'Remaining'}
+                    label={isMyBooking ? (extra > 0 ? 'Remaining' : 'Remaining') : 'Pending Amount'}
                     value={extra > 0 ? `₹0 (paid in full)` : `₹${dispR.toLocaleString()}`}
                     valueColor={cfg.color}
                     bold
                 />
-                {extra > 0 && (
+                {isMyBooking && extra > 0 && (
                     <Row label="Extra Paid" value={`+₹${extra.toLocaleString()}`} valueColor="#1B5E20" bold />
                 )}
 
-                {/* Price History */}
-                {item.priceHistory && item.priceHistory.length > 0 && (
+                {/* Payment Log — only visible for own bookings */}
+                {isMyBooking && item.payments && item.payments.length > 0 && (
+                    <>
+                        <View style={styles.separator} />
+                        <TouchableOpacity
+                            style={styles.logBtn}
+                            onPress={() => navigation.navigate('PaymentLogs', {
+                                bookingId: item._id,
+                                mandalName: mandal?.ganpatiTitle,
+                                year: item.year,
+                            })}
+                        >
+                            <View style={styles.logBtnLeft}>
+                                <Text style={styles.logBtnTitle}>Payment Log</Text>
+                                <Text style={styles.logBtnSub}>
+                                    {item.payments.length} {item.payments.length === 1 ? 'entry' : 'entries'} · ₹{(item.totalPaid || 0).toLocaleString()} received
+                                </Text>
+                            </View>
+                            <Text style={styles.logBtnArrow}>›</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
+
+                {/* Price History — only for own bookings */}
+                {isMyBooking && item.priceHistory && item.priceHistory.length > 0 && (
                     <>
                         <View style={styles.separator} />
                         <Text style={styles.priceHistoryTitle}>PRICE HISTORY</Text>
@@ -133,6 +163,22 @@ export default function MandalDetailsScreen({ route, navigation }) {
                                         {[mandal.area, mandal.city].filter(Boolean).join(', ')}
                                     </Text>
                                 ) : null}
+                                {/* Overall grade badge */}
+                                {(() => {
+                                    const ogCfg = mandal?.overallGrade
+                                        ? getOverallGradeConfig(mandal.overallGrade)
+                                        : null;
+                                    return ogCfg ? (
+                                        <View style={styles.bannerGradeWrap}>
+                                            <View style={[styles.bannerGradeBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
+                                                <Text style={[styles.bannerGradeBadgeText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
+                                            </View>
+                                            <Text style={[styles.bannerGradeLabel, { color: ogCfg.color }]}>
+                                                Grade {ogCfg.label} — {ogCfg.fullLabel} Payer
+                                            </Text>
+                                        </View>
+                                    ) : null;
+                                })()}
                             </View>
                             <Text style={styles.sectionHeading}>BOOKING HISTORY</Text>
                         </View>
@@ -184,6 +230,16 @@ const styles = StyleSheet.create({
     mandalName: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
     mandalLocation: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 4 },
 
+    // Overall grade in banner
+    bannerGradeWrap: { alignItems: 'center', marginTop: Spacing.md },
+    bannerGradeBadge: {
+        width: 44, height: 44, borderRadius: 22,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 2.5, marginBottom: 4,
+    },
+    bannerGradeBadgeText: { fontSize: Font.xl, fontWeight: '900' },
+    bannerGradeLabel: { fontSize: Font.sm, fontWeight: '700' },
+
     sectionHeading: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.4, marginBottom: Spacing.md },
 
     bookingCard: {
@@ -221,4 +277,14 @@ const styles = StyleSheet.create({
     priceHistoryChange: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
     priceHistoryReason: { fontSize: Font.xs, color: Colors.textSecondary, marginTop: 1 },
     priceHistoryDate: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 1 },
+
+    // Payment Log button (links to PaymentLogsScreen)
+    logBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingVertical: Spacing.sm, marginTop: 4,
+    },
+    logBtnLeft: { flex: 1 },
+    logBtnTitle: { fontSize: Font.sm, fontWeight: '700', color: '#BF360C' },
+    logBtnSub: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 },
+    logBtnArrow: { fontSize: 20, color: Colors.accent, marginLeft: Spacing.sm },
 });

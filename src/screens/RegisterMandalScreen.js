@@ -17,8 +17,8 @@ export default function RegisterMandalScreen({ navigation }) {
     const set = (key) => (val) => setForm(f => ({ ...f, [key]: val }));
 
     const handleSubmit = async () => {
-        if (!form.ganpatiTitle.trim() || !form.mandalName.trim()) {
-            toast.error('Ganpati title and mandal name are required.');
+        if (!form.ganpatiTitle.trim() || !form.mandalName.trim() || !form.area.trim() || !form.city.trim()) {
+            toast.error('Ganpati title, mandal name, area and city are required.');
             return;
         }
         setLoading(true);
@@ -41,8 +41,8 @@ export default function RegisterMandalScreen({ navigation }) {
             <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
                 <InputField label="Ganpati Title *" value={form.ganpatiTitle} onChangeText={set('ganpatiTitle')} placeholder="e.g. Ganesh Galli" />
                 <InputField label="Mandal Name *" value={form.mandalName} onChangeText={set('mandalName')} placeholder="e.g. Sarvajanik Ganeshotsav Mandal" />
-                <InputField label="Area" value={form.area} onChangeText={set('area')} placeholder="e.g. Dadar" />
-                <InputField label="City" value={form.city} onChangeText={set('city')} placeholder="e.g. Mumbai" />
+                <InputField label="Area *" value={form.area} onChangeText={set('area')} placeholder="e.g. Dadar" />
+                <InputField label="City *" value={form.city} onChangeText={set('city')} placeholder="e.g. Mumbai" />
                 <PrimaryButton title="Register Mandal" onPress={handleSubmit} loading={loading} style={styles.btn} />
             </ScrollView>
         </KeyboardAvoidingView>
