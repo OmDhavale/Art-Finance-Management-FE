@@ -28,7 +28,7 @@ function StatCard({ label, value, iconName, tinted, style, footer }) {
 const statStyles = StyleSheet.create({
     card: {
         flex: 1, backgroundColor: Colors.card, borderRadius: Radius.lg,
-        padding: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+        padding: Spacing.md, ...Shadow.sm,
     },
     tinted: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
@@ -80,7 +80,7 @@ const activityStyles = StyleSheet.create({
         backgroundColor: Colors.card, borderRadius: Radius.lg,
         padding: Spacing.md, marginBottom: Spacing.md,
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+        ...Shadow.sm,
     },
     left: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     iconCircle: {
@@ -334,7 +334,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.card, borderRadius: Radius.lg,
         flexDirection: 'row', alignItems: 'center',
         padding: Spacing.md, paddingVertical: 14,
-        borderWidth: 1, borderColor: Colors.cardBorder,
         ...Shadow.sm, marginTop: Spacing.xs,
     },
     secondaryIconWrap: {

@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
 
     card: {
         backgroundColor: Colors.card, borderRadius: Radius.lg,
-        marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder,
+        marginBottom: Spacing.md,
         ...Shadow.sm, overflow: 'hidden',
     },
     cardHeader: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md },

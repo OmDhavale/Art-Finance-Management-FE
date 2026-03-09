@@ -87,7 +87,7 @@ export default function LoginScreen({ navigation }) {
                     <View style={styles.passwordHeader}>
                         <Text style={styles.passwordLabel}>Password</Text>
                         <TouchableOpacity>
-                            <Text style={styles.forgotLink}>Forgot?</Text>
+                            {/* <Text style={styles.forgotLink}>Forgot?</Text> */}
                         </TouchableOpacity>
                     </View>
                     <InputField
@@ -123,7 +123,7 @@ export default function LoginScreen({ navigation }) {
                     style={styles.registerBtn}
                 />
 
-                <Text style={styles.footer}>Jai Ganesh • Crafting Excellence Since 2024</Text>
+                <Text style={styles.footer}>Jai Ganesh • Crafting Excellence Since 2026</Text>
             </ScrollView>
         </KeyboardAvoidingView>
     );

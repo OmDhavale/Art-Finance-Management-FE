@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     ActivityIndicator, Animated, StatusBar, ScrollView, RefreshControl,
-    Alert,
+    Alert, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../api/api';
@@ -57,6 +57,11 @@ export default function MandalDetailsScreen({ route, navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
+    // Price Edit Modal State
+    const [priceModalVisible, setPriceModalVisible] = useState(false);
+    const [newPrice, setNewPrice] = useState('');
+    const [actionLoading, setActionLoading] = useState(false);
+
     useEffect(() => { fetchDetails(); }, [mandalId]);
 
     const fetchDetails = async (isRefresh = false) => {
@@ -77,38 +82,31 @@ export default function MandalDetailsScreen({ route, navigation }) {
 
     const handleEditPrice = () => {
         if (!myLatestBooking) return;
+        setNewPrice(String(myLatestBooking.finalPrice));
+        setPriceModalVisible(true);
+    };
 
-        Alert.prompt(
-            "Edit Final Price",
-            `Current agreed price: ₹${myLatestBooking.finalPrice.toLocaleString()}\n\nEnter the new agreed price:`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Update",
-                    onPress: async (newPrice) => {
-                        const price = parseFloat(newPrice);
-                        if (isNaN(price) || price < 0) {
-                            return toast.error("Please enter a valid amount.");
-                        }
-                        try {
-                            setLoading(true);
-                            await api.patch(`/bookings/${myLatestBooking._id}/price`, {
-                                finalPrice: price,
-                                note: "Price updated from Mandal Details screen"
-                            });
-                            toast.success("Agreed price updated successfully.");
-                            fetchDetails();
-                        } catch (err) {
-                            toast.error(err.response?.data?.message || "Failed to update price.");
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
-            ],
-            "plain-text",
-            String(myLatestBooking.finalPrice)
-        );
+    const submitPriceUpdate = async () => {
+        const price = parseFloat(newPrice);
+        if (isNaN(price) || price < 0) {
+            return toast.error("Please enter a valid amount.");
+        }
+
+        setActionLoading(true);
+        try {
+            await api.patch(`/bookings/${myLatestBooking._id}/price`, {
+                finalPrice: price,
+                reason: "Negotiation"
+            });
+            toast.success("Agreed price updated successfully.");
+            setPriceModalVisible(false);
+            fetchDetails(true);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to update price.");
+        } finally {
+            setActionLoading(true); // Small delay feel
+            setTimeout(() => setActionLoading(false), 500);
+        }
     };
 
     const handleCloseBooking = () => {
@@ -116,18 +114,18 @@ export default function MandalDetailsScreen({ route, navigation }) {
 
         Alert.alert(
             "Close Booking?",
-            "Closing this booking will mark it as finalized. This action cannot be undone.",
+            "Closing this booking will finalize the current status. You can still view it in history.",
             [
-                { text: "No", style: "cancel" },
+                { text: "Cancel", style: "cancel" },
                 {
-                    text: "Yes, Close It",
+                    text: "Confirm Close",
                     style: "destructive",
                     onPress: async () => {
+                        setLoading(true);
                         try {
-                            setLoading(true);
                             await api.patch(`/bookings/${myLatestBooking._id}/close`);
                             toast.success("Booking closed successfully.");
-                            fetchDetails();
+                            fetchDetails(true);
                         } catch (err) {
                             toast.error(err.response?.data?.message || "Failed to close booking.");
                         } finally {
@@ -362,6 +360,66 @@ export default function MandalDetailsScreen({ route, navigation }) {
                     </View>
                 </View>
             ) : null}
+
+            {/* Edit Price Modal */}
+            <Modal
+                visible={priceModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPriceModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Update agreed price</Text>
+                            <TouchableOpacity onPress={() => setPriceModalVisible(false)}>
+                                <Feather name="x" size={20} color={Colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.modalSub}>
+                            Updating the final Price for "{mandal?.ganpatiTitle}".
+                            Current: ₹{myLatestBooking?.finalPrice?.toLocaleString()}
+                        </Text>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputPrefix}>₹</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newPrice}
+                                onChangeText={setNewPrice}
+                                keyboardType="numeric"
+                                placeholder="Enter new price"
+                                placeholderTextColor={Colors.textMuted}
+                                autoFocus
+                            />
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={styles.cancelBtn}
+                                onPress={() => setPriceModalVisible(false)}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.submitBtn, actionLoading && styles.btnDisabled]}
+                                onPress={submitPriceUpdate}
+                                disabled={actionLoading}
+                            >
+                                {actionLoading ? (
+                                    <ActivityIndicator size="small" color={Colors.white} />
+                                ) : (
+                                    <Text style={styles.submitText}>Save Changes</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </View>
     );
 }
@@ -502,7 +560,32 @@ const styles = StyleSheet.create({
     },
     addPayText: { fontSize: Font.md, fontWeight: '700', color: Colors.white },
     footerActions: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.xl },
-    footerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
+    footerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12 },
     footerActionText: { fontSize: Font.sm, color: Colors.primary, fontWeight: '600' },
-    footerDivider: { width: 1, backgroundColor: Colors.separator },
+    footerDivider: { width: 1, backgroundColor: Colors.separator, marginVertical: 8 },
+
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', padding: Spacing.xl },
+    modalCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xl, ...Shadow.md },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+    modalTitle: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
+    modalSub: { fontSize: Font.xs, color: Colors.textSecondary, marginBottom: Spacing.lg, lineHeight: 16 },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.bg,
+        borderRadius: Radius.md,
+        paddingHorizontal: Spacing.md,
+        borderWidth: 1.5,
+        borderColor: Colors.separator,
+        marginBottom: Spacing.xl,
+    },
+    inputPrefix: { fontSize: Font.lg, fontWeight: '700', color: Colors.textMuted, marginRight: 8 },
+    modalInput: { flex: 1, paddingVertical: 14, fontSize: Font.lg, fontWeight: '700', color: Colors.textPrimary },
+    modalActions: { flexDirection: 'row', gap: Spacing.md },
+    cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.separator },
+    cancelText: { color: Colors.textSecondary, fontWeight: '700', fontSize: Font.sm },
+    submitBtn: { flex: 2, backgroundColor: Colors.primary, paddingVertical: 14, alignItems: 'center', borderRadius: Radius.md, ...Shadow.sm },
+    submitText: { color: Colors.white, fontWeight: '800', fontSize: Font.sm },
+    btnDisabled: { opacity: 0.7 },
 });

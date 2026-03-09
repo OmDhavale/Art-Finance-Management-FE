@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: Colors.card, borderRadius: Radius.lg,
         padding: Spacing.lg, marginBottom: Spacing.md,
-        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+        ...Shadow.sm,
     },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
     cardInfo: { flex: 1, marginRight: Spacing.sm },

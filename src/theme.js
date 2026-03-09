@@ -10,7 +10,7 @@ export const Colors = {
     bg: '#F1F5F9',               // Cool off-white page background
     surface: '#FFFFFF',          // Pure white surfaces
     card: '#FFFFFF',             // Card background
-    cardBorder: '#E2E8F0',       // Subtle card border
+    cardBorder: '#F1F5F9',       // Even more subtle card border
 
     // Text
     textPrimary: '#0F172A',      // Near-black
@@ -56,12 +56,12 @@ export const Font = {
 
 export const Shadow = {
     sm: {
-        shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 }, elevation: 2,
+        shadowColor: 'rgba(15, 23, 42, 0.08)', shadowOpacity: 1, shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 }, elevation: 3,
     },
     md: {
-        shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 16,
-        shadowOffset: { width: 0, height: 4 }, elevation: 4,
+        shadowColor: 'rgba(15, 23, 42, 0.12)', shadowOpacity: 1, shadowRadius: 24,
+        shadowOffset: { width: 0, height: 8 }, elevation: 6,
     },
 };
 
