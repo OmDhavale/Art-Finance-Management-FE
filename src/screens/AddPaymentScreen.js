@@ -3,7 +3,7 @@ import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
     KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
-import api from '../api/api';
+import api, { getBookingPath } from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
@@ -26,7 +26,8 @@ export default function AddPaymentScreen({ route, navigation }) {
         }
         setLoading(true);
         try {
-            await api.post(`/bookings/${bookingId}/payments`, {
+            const bookingPath = getBookingPath();
+            await api.post(`${bookingPath}/${bookingId}/payments`, {
                 amount: Number(amount),
                 paymentMode,
                 paymentDate,

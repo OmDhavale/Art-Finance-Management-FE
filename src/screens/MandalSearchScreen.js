@@ -3,7 +3,7 @@ import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     ActivityIndicator, StatusBar,
 } from 'react-native';
-import api from '../api/api';
+import api, { getMandalPath } from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
 import { Colors, Font, Radius, Spacing, getOverallGradeConfig } from '../theme';
@@ -19,7 +19,8 @@ export default function MandalSearchScreen({ navigation }) {
         setLoading(true);
         setSearched(true);
         try {
-            const res = await api.get(`/mandals/search?q=${encodeURIComponent(query.trim())}`);
+            const mandalPath = getMandalPath();
+            const res = await api.get(`${mandalPath}/search?q=${encodeURIComponent(query.trim())}`);
             setResults(res.data.data || []);
         } catch {
             setResults([]);

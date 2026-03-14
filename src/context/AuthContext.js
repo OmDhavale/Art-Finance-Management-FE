@@ -52,6 +52,17 @@ export const AuthProvider = ({ children }) => {
     };
 
 
+    const registerArtist = async (fields) => {
+        const response = await api.post('/auth/register/artist', fields);
+        const { token: t, user: u } = response.data;
+        await storage.setItem('token', t);
+        await storage.setItem('user', JSON.stringify(u));
+        setToken(t);
+        setUser(u);
+        return response.data;
+    };
+
+
     const logout = async () => {
         await storage.removeItem('token');
         await storage.removeItem('user');
@@ -61,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, logout, register }}>
+        <AuthContext.Provider value={{ user, token, loading, login, logout, register, registerArtist }}>
             {children}
         </AuthContext.Provider>
     );

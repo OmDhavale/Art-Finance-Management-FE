@@ -4,7 +4,7 @@ import {
     ScrollView, KeyboardAvoidingView, Platform, Switch,
     Animated, StatusBar, ActivityIndicator, TextInput, RefreshControl,
 } from 'react-native';
-import api from '../api/api';
+import api, { getBookingPath, getMandalPath } from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
@@ -42,7 +42,8 @@ export default function BookMandalScreen({ navigation }) {
     const fetchMandals = useCallback(async (isRefresh = false) => {
         if (!isRefresh) setLoading(true);
         try {
-            const res = await api.get('/mandals');
+            const mandalPath = getMandalPath();
+            const res = await api.get(mandalPath);
             setAllMandals(res.data.data || []);
             Animated.timing(listFade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
         } catch {
@@ -96,7 +97,8 @@ export default function BookMandalScreen({ navigation }) {
 
         setSubmitting(true);
         try {
-            await api.post('/bookings', {
+            const bookingPath = getBookingPath();
+            await api.post(bookingPath, {
                 mandalId: selectedMandal._id,
                 year: Number(year),
                 murtiSize,

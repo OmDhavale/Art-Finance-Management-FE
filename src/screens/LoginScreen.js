@@ -87,9 +87,16 @@ export default function LoginScreen({ navigation }) {
                         style={styles.btn}
                     />
 
-                    <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkWrap}>
-                        <Text style={styles.link}>New here? <Text style={styles.linkBold}>Create an account</Text></Text>
-                    </TouchableOpacity>
+                    <View style={styles.registerRow}>
+                        <Text style={styles.link}>New here? </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                            <Text style={styles.linkBold}>Register as Murtikar</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.link}> or </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('ArtistRegister')}>
+                            <Text style={styles.linkBold}>Artist</Text>
+                        </TouchableOpacity>
+                    </View>
                 </Animated.View>
 
             </ScrollView>
@@ -114,7 +121,7 @@ const styles = StyleSheet.create({
     },
     cardTitle: { fontSize: Font.xl, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.lg },
     btn: { marginTop: Spacing.md },
-    linkWrap: { marginTop: Spacing.lg, alignItems: 'center' },
+    registerRow: { marginTop: Spacing.lg, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' },
     link: { color: Colors.textSecondary, fontSize: Font.sm },
-    linkBold: { color: Colors.accent, fontWeight: '700' },
+    linkBold: { color: Colors.accent, fontWeight: '700', fontSize: Font.sm },
 });

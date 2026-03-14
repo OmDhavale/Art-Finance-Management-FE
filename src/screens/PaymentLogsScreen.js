@@ -3,7 +3,7 @@ import {
     View, Text, StyleSheet, FlatList, ActivityIndicator,
     Animated, StatusBar,
 } from 'react-native';
-import api from '../api/api';
+import api, { getBookingPath } from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing } from '../theme';
 import { toast } from '../utils/toast';
@@ -31,7 +31,8 @@ export default function PaymentLogsScreen({ route, navigation }) {
     const fetchPayments = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/bookings/${bookingId}`);
+            const bookingPath = getBookingPath();
+            const res = await api.get(`${bookingPath}/${bookingId}`);
             const booking = res.data.data;
             const sorted = [...(booking.payments || [])].sort(
                 (a, b) => new Date(b.paymentDate || b.createdAt) - new Date(a.paymentDate || a.createdAt)

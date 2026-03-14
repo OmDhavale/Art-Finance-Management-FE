@@ -3,7 +3,7 @@ import {
     View, StyleSheet, ScrollView,
     KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
-import api from '../api/api';
+import api, { getMandalPath } from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
@@ -23,7 +23,8 @@ export default function RegisterMandalScreen({ navigation }) {
         }
         setLoading(true);
         try {
-            const res = await api.post('/mandals', form);
+            const mandalPath = getMandalPath();
+            const res = await api.post(mandalPath, form);
             const mandalId = res.data.data._id;
             toast.success(`${form.ganpatiTitle} has been registered.`, 'Mandal Registered');
             setTimeout(() => navigation.replace('MandalDetails', { mandalId }), 1200);

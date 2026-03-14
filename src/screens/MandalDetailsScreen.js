@@ -3,7 +3,7 @@ import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     ActivityIndicator, Animated, StatusBar,
 } from 'react-native';
-import api from '../api/api';
+import api, { getMandalPath } from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing, getGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
@@ -22,7 +22,8 @@ export default function MandalDetailsScreen({ route, navigation }) {
     const fetchDetails = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/mandals/${mandalId}`);
+            const mandalPath = getMandalPath();
+            const res = await api.get(`${mandalPath}/${mandalId}`);
             setMandal(res.data.data.mandal);
             setBookings(res.data.data.bookingHistory || []);
             Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();

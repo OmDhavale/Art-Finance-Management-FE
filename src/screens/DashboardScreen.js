@@ -102,7 +102,11 @@ const SECONDARY_ACTIONS = [
 export default function DashboardScreen({ navigation }) {
     const { user, logout } = useAuth();
     const isOwner = user?.role === 'owner';
-    const visibleSecondary = SECONDARY_ACTIONS.filter(a => !a.ownerOnly || isOwner);
+    const isArtist = user?.role === 'sketch-artist';
+    const visibleSecondary = SECONDARY_ACTIONS.filter(a => {
+        if (isArtist) return false; // Artists don't see secondary actions
+        return !a.ownerOnly || isOwner;
+    });
 
     const headerFade = useRef(new Animated.Value(0)).current;
     const primaryAnims = useRef(PRIMARY_ACTIONS.map(() => new Animated.Value(0))).current;
@@ -120,6 +124,11 @@ export default function DashboardScreen({ navigation }) {
         });
     }, []);
 
+    const getRoleLabel = () => {
+        if (isArtist) return 'Sketch Artist';
+        return 'Murtikar';
+    };
+
     return (
         <SafeAreaView style={styles.safe}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
@@ -129,7 +138,7 @@ export default function DashboardScreen({ navigation }) {
                 <Animated.View style={[styles.header, { opacity: headerFade }]}>
                     <View>
                         <Text style={styles.greeting}>Welcome back</Text>
-                        <Text style={styles.userName}>{user?.name || 'Murtikar'}</Text>
+                        <Text style={styles.userName}>{user?.name || getRoleLabel()}</Text>
                         {user?.workshopName ? (
                             <Text style={styles.workshop}>{user.workshopName}</Text>
                         ) : null}

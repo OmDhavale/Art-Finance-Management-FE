@@ -4,7 +4,7 @@ import {
     Animated, ActivityIndicator, StatusBar, Modal,
     TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import api from '../api/api';
+import api, { getBookingPath } from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import PrimaryButton from '../components/PrimaryButton';
@@ -29,7 +29,8 @@ export default function MyBookingsScreen({ navigation }) {
     const fetchBookings = useCallback(async (isRefresh = false) => {
         if (!isRefresh) setLoading(true);
         try {
-            const res = await api.get('/bookings/my');
+            const bookingPath = getBookingPath();
+            const res = await api.get(`${bookingPath}/my`);
             setBookings(res.data.data || []);
             Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
         } catch {
@@ -56,7 +57,8 @@ export default function MyBookingsScreen({ navigation }) {
         }
         setEditLoading(true);
         try {
-            const res = await api.patch(`/bookings/${editModal.bookingId}/price`, { finalPrice: price });
+            const bookingPath = getBookingPath();
+            const res = await api.patch(`${bookingPath}/${editModal.bookingId}/price`, { finalPrice: price });
             const updated = res.data.data;
             setBookings(prev => prev.map(b => b._id === updated._id ? { ...b, ...updated } : b));
             toast.success('Price updated successfully.');
