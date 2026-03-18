@@ -54,7 +54,7 @@ export default function BookMandalScreen({ navigation }) {
         }
     }, []);
 
-    useEffect(() => { fetchMandals(); }, []);
+    useEffect(() => { fetchMandals(); }, [user?.plan]);
 
     const setB = (key) => (val) => setBooking(b => ({ ...b, [key]: val }));
 
@@ -97,6 +97,14 @@ export default function BookMandalScreen({ navigation }) {
 
         setSubmitting(true);
         try {
+            // Frontend safety check for FREE users (Backend also enforces this)
+            if (user?.plan === 'FREE') {
+                const currentYear = new Date().getFullYear();
+                const res = await api.get('/bookings/my'); 
+                // Actually, let's just let the backend handle the error and catch it here.
+                // The backend returns a specific message.
+            }
+
             await api.post('/bookings', {
                 mandalId: selectedMandal._id,
                 year: Number(year),
@@ -109,7 +117,19 @@ export default function BookMandalScreen({ navigation }) {
             toast.success('Booking created successfully.', 'Booked');
             setTimeout(() => navigation.navigate('Dashboard'), 1200);
         } catch (err) {
-            toast.error(err?.response?.data?.message || 'Failed to create booking.');
+            const msg = err?.response?.data?.message || 'Failed to create booking.';
+            if (msg.includes("limit reached")) {
+                Alert.alert(
+                    "Limit Reached",
+                    "You've reached the 15 bookings limit for the FREE plan. Upgrade to PRO for unlimited bookings!",
+                    [
+                        { text: "Later", style: "cancel" },
+                        { text: "Upgrade Now", onPress: () => navigation.navigate('UpgradePlan') }
+                    ]
+                );
+            } else {
+                toast.error(msg);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -155,14 +175,29 @@ export default function BookMandalScreen({ navigation }) {
                         {/* Overall grade badge */}
                         {selectedMandal?.overallGrade ? (() => {
                             const ogCfg = getOverallGradeConfig(selectedMandal.overallGrade);
+                            const isFree = user?.plan === 'FREE';
+                            
                             return ogCfg ? (
                                 <View style={styles.selectedGradeRow}>
-                                    <View style={[styles.overallBadgeLg, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
-                                        <Text style={[styles.overallBadgeLgText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
-                                    </View>
-                                    <Text style={[styles.selectedGradeLabel, { color: ogCfg.color }]}>
-                                        {ogCfg.fullLabel} Payer
-                                    </Text>
+                                    {isFree ? (
+                                        <>
+                                            <View style={[styles.overallBadgeLg, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
+                                                <Feather name="lock" size={16} color={Colors.textMuted} />
+                                            </View>
+                                            <Text style={[styles.selectedGradeLabel, { color: Colors.textMuted }]}>
+                                                {['B', 'C', 'D'].includes(selectedMandal.overallGrade) ? '⚠️ Potential past dues' : '✅ Reliable history'}
+                                            </Text>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <View style={[styles.overallBadgeLg, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
+                                                <Text style={[styles.overallBadgeLgText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
+                                            </View>
+                                            <Text style={[styles.selectedGradeLabel, { color: ogCfg.color }]}>
+                                                {ogCfg.fullLabel} Payer
+                                            </Text>
+                                        </>
+                                    )}
                                 </View>
                             ) : null;
                         })() : (
@@ -177,59 +212,69 @@ export default function BookMandalScreen({ navigation }) {
 
                     {/* Previous Murtikars quick summary */}
                     {selectedMandal?.bookingSummary?.length > 0 && (
-                        <View style={styles.historyCard}>
-                            <View style={styles.historyHeaderRow}>
-                                <Text style={styles.historyLabel}>PREVIOUS MURTIKARS</Text>
-                                <TextInput
-                                    style={styles.historySearch}
-                                    placeholder="Search Year..."
-                                    placeholderTextColor={Colors.textMuted}
-                                    value={historyQuery}
-                                    onChangeText={setHistoryQuery}
-                                />
+                        user?.plan === 'FREE' ? (
+                            <View style={styles.restrictedHistory}>
+                                <Feather name="lock" size={16} color={Colors.textMuted} />
+                                <Text style={styles.restrictedHistoryText}>Upgrade to PRO to view full Mandal history</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')}>
+                                    <Text style={styles.upgradeLink}>Upgrade →</Text>
+                                </TouchableOpacity>
                             </View>
+                        ) : (
+                            <View style={styles.historyCard}>
+                                <View style={styles.historyHeaderRow}>
+                                    <Text style={styles.historyLabel}>PREVIOUS MURTIKARS</Text>
+                                    <TextInput
+                                        style={styles.historySearch}
+                                        placeholder="Search Year..."
+                                        placeholderTextColor={Colors.textMuted}
+                                        value={historyQuery}
+                                        onChangeText={setHistoryQuery}
+                                    />
+                                </View>
 
-                            <ScrollView
-                                style={styles.historyScroll}
-                                showsVerticalScrollIndicator={true}
-                                nestedScrollEnabled={true}
-                            >
-                                {selectedMandal.bookingSummary
-                                    .filter(b =>
+                                <ScrollView
+                                    style={styles.historyScroll}
+                                    showsVerticalScrollIndicator={true}
+                                    nestedScrollEnabled={true}
+                                >
+                                    {selectedMandal.bookingSummary
+                                        .filter(b =>
+                                            !historyQuery ||
+                                            String(b.year).includes(historyQuery) ||
+                                            b.vendorName?.toLowerCase().includes(historyQuery.toLowerCase())
+                                        )
+                                        .map((b, i) => {
+                                            const gc = gradeConfig[b.grade] || gradeConfig.red;
+                                            return (
+                                                <View key={i} style={styles.historyRow}>
+                                                    <View style={styles.historyLeft}>
+                                                        <Text style={styles.historyYear}>{b.year}</Text>
+                                                        <Text style={styles.historyVendor} numberOfLines={1}>{b.vendorName}</Text>
+                                                        {b.workshopName ? <Text style={styles.historyWorkshop} numberOfLines={1}>{b.workshopName}</Text> : null}
+                                                    </View>
+                                                    <View style={styles.historyRight}>
+                                                        <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                            <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                                        </View>
+                                                        <Text style={[styles.historyPending, { color: gc.color }]}>
+                                                            ₹{b.remainingAmount.toLocaleString()} due
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })
+                                    }
+                                    {selectedMandal.bookingSummary.filter(b =>
                                         !historyQuery ||
                                         String(b.year).includes(historyQuery) ||
                                         b.vendorName?.toLowerCase().includes(historyQuery.toLowerCase())
-                                    )
-                                    .map((b, i) => {
-                                        const gc = gradeConfig[b.grade] || gradeConfig.red;
-                                        return (
-                                            <View key={i} style={styles.historyRow}>
-                                                <View style={styles.historyLeft}>
-                                                    <Text style={styles.historyYear}>{b.year}</Text>
-                                                    <Text style={styles.historyVendor} numberOfLines={1}>{b.vendorName}</Text>
-                                                    {b.workshopName ? <Text style={styles.historyWorkshop} numberOfLines={1}>{b.workshopName}</Text> : null}
-                                                </View>
-                                                <View style={styles.historyRight}>
-                                                    <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                                        <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
-                                                    </View>
-                                                    <Text style={[styles.historyPending, { color: gc.color }]}>
-                                                        ₹{b.remainingAmount.toLocaleString()} due
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        );
-                                    })
-                                }
-                                {selectedMandal.bookingSummary.filter(b =>
-                                    !historyQuery ||
-                                    String(b.year).includes(historyQuery) ||
-                                    b.vendorName?.toLowerCase().includes(historyQuery.toLowerCase())
-                                ).length === 0 && (
-                                        <Text style={styles.historyEmpty}>No matching records found.</Text>
-                                    )}
-                            </ScrollView>
-                        </View>
+                                    ).length === 0 && (
+                                            <Text style={styles.historyEmpty}>No matching records found.</Text>
+                                        )}
+                                </ScrollView>
+                            </View>
+                        )
                     )}
 
                     {/* Year chip picker */}
@@ -486,6 +531,8 @@ export default function BookMandalScreen({ navigation }) {
                             expanded={expanded === item._id}
                             onToggle={() => setExpanded(prev => prev === item._id ? null : item._id)}
                             onBook={(yr) => selectMandal(item, yr)}
+                            plan={user?.plan}
+                            navigation={navigation}
                         />
                     )}
                 />
@@ -494,7 +541,8 @@ export default function BookMandalScreen({ navigation }) {
     );
 }
 
-function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
+function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan, navigation }) {
+    const isFree = plan !== 'PRO';
     const scale = useRef(new Animated.Value(1)).current;
     const onIn = () => Animated.spring(scale, { toValue: 0.985, useNativeDriver: true, speed: 40 }).start();
     const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
@@ -543,7 +591,11 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
                     </View>
                     <View style={styles.cardRight}>
                         {/* Overall O/A/B/C/D grade badge */}
-                        {ogCfg ? (
+                        {isFree ? (
+                            <View style={[styles.overallBadge, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
+                                <Feather name="lock" size={14} color={Colors.textMuted} />
+                            </View>
+                        ) : ogCfg ? (
                             <View style={[styles.overallBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }, isDisabled && styles.badgeDisabled]}>
                                 <Text style={[styles.overallBadgeText, { color: ogCfg.color }, isDisabled && styles.badgeTextDisabled]}>{ogCfg.label}</Text>
                             </View>
@@ -553,10 +605,14 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
                             </View>
                         )}
                         {ogCfg && !isDisabled && (
-                            <Text style={[styles.overallBadgeLabel, { color: ogCfg.color }]}>{ogCfg.fullLabel}</Text>
+                            <Text style={[styles.overallBadgeLabel, { color: ogCfg.color }]}>
+                                {isFree ? (
+                                    ['B', 'C', 'D'].includes(mandal.overallGrade) ? '⚠️ Potential dues' : '✅ Reliable'
+                                ) : ogCfg.fullLabel}
+                            </Text>
                         )}
                         <Text style={[styles.totalPending, isDisabled && { color: Colors.textMuted }]}>
-                            {mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'All clear'}
+                            {isFree ? 'Upgrade to view' : mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'All clear'}
                         </Text>
                     </View>
                 </View>
@@ -566,33 +622,44 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
             {expanded && mandal.bookingSummary?.length > 0 && (
                 <View style={styles.breakdown}>
                     <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
-                    {mandal.bookingSummary.map((b, i) => {
-                        const gc = getGradeConfig(b.remainingAmount);
-                        const rawR = b.remainingAmount;
-                        const dispR = Math.max(0, rawR);
-                        const extra = rawR < 0 ? Math.abs(rawR) : 0;
-                        return (
-                            <View key={i} style={styles.breakdownRow}>
-                                <View style={styles.breakdownLeft}>
-                                    <Text style={styles.breakdownYear}>{b.year}</Text>
-                                    <Text style={styles.breakdownVendor}>{b.vendorName}</Text>
-                                    {b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
-                                </View>
-                                <View style={styles.breakdownRight}>
-                                    <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                        <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                        {mandal.bookingSummary.map((b, i) => {
+                            const gc = getGradeConfig(b.remainingAmount);
+                            const rawR = b.remainingAmount;
+                            const dispR = Math.max(0, rawR);
+                            const extra = rawR < 0 ? Math.abs(rawR) : 0;
+                            return (
+                                <View key={i} style={styles.breakdownRow}>
+                                    <View style={styles.breakdownLeft}>
+                                        <Text style={styles.breakdownYear}>{b.year}</Text>
+                                        <Text style={styles.breakdownVendor}>
+                                            {isFree ? '🔒 Hidden (PRO feature)' : b.vendorName}
+                                        </Text>
+                                        {!isFree && b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
                                     </View>
-                                    <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                        ₹{dispR.toLocaleString()}
-                                    </Text>
-                                    <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
-                                    {extra > 0 && (
-                                        <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
-                                    )}
+                                    <View style={styles.breakdownRight}>
+                                        {isFree ? (
+                                            <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')} style={styles.lockHint}>
+                                                <Feather name="lock" size={12} color={Colors.primary} />
+                                                <Text style={styles.lockHintText}>Unlock History</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <>
+                                                <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                    <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                                </View>
+                                                <Text style={[styles.breakdownAmt, { color: gc.color }]}>
+                                                    ₹{dispR.toLocaleString()}
+                                                </Text>
+                                                <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                                {extra > 0 && (
+                                                    <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
+                                                )}
+                                            </>
+                                        )}
+                                    </View>
                                 </View>
-                            </View>
-                        );
-                    })}
+                            );
+                        })}
                 </View>
             )}
 
@@ -798,6 +865,13 @@ const styles = StyleSheet.create({
     historyWorkshop: { fontSize: Font.xs, color: Colors.textMuted },
     historyRight: { alignItems: 'flex-end' },
     historyPending: { fontSize: Font.xs, fontWeight: '600', marginTop: 2 },
+    restrictedHistory: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.md,
+        flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.lg,
+        borderWidth: 1, borderColor: Colors.cardBorder, borderStyle: 'dashed',
+    },
+    restrictedHistoryText: { fontSize: 11, color: Colors.textMuted, flex: 1, fontWeight: '600' },
+    upgradeLink: { fontSize: 11, fontWeight: '800', color: Colors.primary },
     historyEmpty: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.md, fontStyle: 'italic' },
 
     btn: { marginTop: Spacing.md },
@@ -838,4 +912,6 @@ const styles = StyleSheet.create({
     yearChipNote: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', marginTop: 2, color: Colors.textMuted },
 
     bookBtnNext: { backgroundColor: Colors.textSecondary, marginTop: -Spacing.xs },
+    lockHint: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#BAE6FD' },
+    lockHintText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
 });

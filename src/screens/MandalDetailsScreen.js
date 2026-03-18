@@ -291,44 +291,75 @@ export default function MandalDetailsScreen({ route, navigation }) {
                     ) : null}
 
                     {/* Older bookings listing */}
-                    {bookings.filter(b => b !== myLatestBooking).length > 0 ? (
-                        <View style={styles.historySection}>
-                            <Text style={styles.historySectionLabel}>ALL MURTIKARS</Text>
-                            {bookings.filter(b => b !== myLatestBooking).map(item => {
-                                const remaining = item.remainingAmount || 0;
-                                const isFullyPaid = remaining <= 0;
-                                const extra = remaining < 0 ? Math.abs(remaining) : 0;
-                                const workshop = item.vendorId?.workshopName || item.vendorId?.name || 'Unknown';
-                                const murtikar = item.vendorId?.name || 'Murtikar';
-
-                                return (
-                                    <View key={item._id} style={styles.historyCard}>
-                                        <View style={styles.historyMainRow}>
-                                            <View style={styles.historyTextCol}>
-                                                <Text style={styles.historyYear}>{item.year}</Text>
-                                                <Text style={styles.historyName}>{murtikar}</Text>
-                                                <Text style={styles.historyWorkshop}>{workshop}</Text>
+                    {user?.plan === 'FREE' ? (
+                         <View style={styles.restrictedSection}>
+                            <Feather name="lock" size={32} color={Colors.textMuted} />
+                            <Text style={styles.restrictedTitle}>
+                                {mandal?.overallGrade && ['B', 'C', 'D'].includes(mandal.overallGrade) ? '⚠️ Potential past dues' : '✅ Reliable history'}
+                            </Text>
+                            
+                            {mandal?.bookingSummary?.length > 0 && (
+                                <View style={styles.glimpseYears}>
+                                    <Text style={styles.glimpseYearsLabel}>BOOKED YEARS:</Text>
+                                    <View style={styles.glimpseYearRow}>
+                                        {mandal.bookingSummary.map((b, i) => (
+                                            <View key={i} style={styles.glimpseYearChip}>
+                                                <Text style={styles.glimpseYearText}>{b.year}</Text>
                                             </View>
-                                            <View style={styles.historyAmountCol}>
-                                                <View style={[styles.statusBadge, isFullyPaid ? styles.statusBadgePaid : styles.statusBadgeDue]}>
-                                                    <Text style={[styles.statusBadgeText, isFullyPaid ? styles.statusBadgePaidText : styles.statusBadgeDueText]}>
-                                                        {isFullyPaid ? 'Fully Paid' : 'Due'}
-                                                    </Text>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+
+                            <Text style={styles.restrictedSub}>Upgrade to PRO to see previous vendors, their detailed payment history, and Mandal grades.</Text>
+                            <TouchableOpacity 
+                                style={styles.upgradeBtnLarge}
+                                onPress={() => navigation.navigate('UpgradePlan')}
+                            >
+                                <Feather name="shield" size={14} color={Colors.white} style={{ marginRight: 8 }} />
+                                <Text style={styles.upgradeBtnTextLarge}>Unlock Full History</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        bookings.filter(b => b !== myLatestBooking).length > 0 ? (
+                            <View style={styles.historySection}>
+                                <Text style={styles.historySectionLabel}>ALL MURTIKARS</Text>
+                                {bookings.filter(b => b !== myLatestBooking).map(item => {
+                                    const remaining = item.remainingAmount || 0;
+                                    const isFullyPaid = remaining <= 0;
+                                    const extra = remaining < 0 ? Math.abs(remaining) : 0;
+                                    const workshop = item.vendorId?.workshopName || item.vendorId?.name || 'Unknown';
+                                    const murtikar = item.vendorId?.name || 'Murtikar';
+
+                                    return (
+                                        <View key={item._id} style={styles.historyCard}>
+                                            <View style={styles.historyMainRow}>
+                                                <View style={styles.historyTextCol}>
+                                                    <Text style={styles.historyYear}>{item.year}</Text>
+                                                    <Text style={styles.historyName}>{murtikar}</Text>
+                                                    <Text style={styles.historyWorkshop}>{workshop}</Text>
                                                 </View>
-                                                <Text style={[styles.historyAmount, !isFullyPaid && { color: Colors.danger }]}>
-                                                    ₹{Math.max(0, remaining).toLocaleString()}
-                                                </Text>
-                                                <Text style={styles.amountLabel}>{isFullyPaid ? 'paid' : 'due'}</Text>
-                                                {extra > 0 && (
-                                                    <Text style={styles.extraText}>+₹{extra.toLocaleString()} extra</Text>
-                                                )}
+                                                <View style={styles.historyAmountCol}>
+                                                    <View style={[styles.statusBadge, isFullyPaid ? styles.statusBadgePaid : styles.statusBadgeDue]}>
+                                                        <Text style={[styles.statusBadgeText, isFullyPaid ? styles.statusBadgePaidText : styles.statusBadgeDueText]}>
+                                                            {isFullyPaid ? 'Fully Paid' : 'Due'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={[styles.historyAmount, !isFullyPaid && { color: Colors.danger }]}>
+                                                        ₹{Math.max(0, remaining).toLocaleString()}
+                                                    </Text>
+                                                    <Text style={styles.amountLabel}>{isFullyPaid ? 'paid' : 'due'}</Text>
+                                                    {extra > 0 && (
+                                                        <Text style={styles.extraText}>+₹{extra.toLocaleString()} extra</Text>
+                                                    )}
+                                                </View>
                                             </View>
                                         </View>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    ) : null}
+                                    );
+                                })}
+                            </View>
+                        ) : null
+                    )}
 
                 </ScrollView>
             </Animated.View>
@@ -359,7 +390,17 @@ export default function MandalDetailsScreen({ route, navigation }) {
                         </TouchableOpacity>
                     </View>
                 </View>
-            ) : null}
+            ) : (
+                <View style={[styles.footer, { paddingBottom: 32 }]}>
+                    <TouchableOpacity
+                        style={styles.addPayBtn}
+                        onPress={() => navigation.navigate('BookMandal', { preSelectedMandal: mandal })}
+                    >
+                        <Feather name="calendar" size={18} color={Colors.white} />
+                        <Text style={styles.addPayText}>Book This Mandal</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Edit Price Modal */}
             <Modal
@@ -588,4 +629,18 @@ const styles = StyleSheet.create({
     submitBtn: { flex: 2, backgroundColor: Colors.primary, paddingVertical: 14, alignItems: 'center', borderRadius: Radius.md, ...Shadow.sm },
     submitText: { color: Colors.white, fontWeight: '800', fontSize: Font.sm },
     btnDisabled: { opacity: 0.7 },
+    restrictedSection: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.xl,
+        alignItems: 'center', marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder,
+        borderStyle: 'dashed',
+    },
+    restrictedTitle: { fontSize: Font.md, fontWeight: '800', color: Colors.textPrimary, marginTop: 12 },
+    restrictedSub: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 18, marginBottom: 20 },
+    upgradeBtnLarge: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.md, ...Shadow.sm },
+    upgradeBtnTextLarge: { color: Colors.white, fontWeight: '700', fontSize: Font.sm },
+    glimpseYears: { alignItems: 'center', marginTop: 12, marginBottom: 8 },
+    glimpseYearsLabel: { fontSize: 9, fontWeight: '800', color: Colors.textMuted, letterSpacing: 1, marginBottom: 6 },
+    glimpseYearRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
+    glimpseYearChip: { backgroundColor: Colors.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: Colors.separator },
+    glimpseYearText: { fontSize: 11, fontWeight: '700', color: Colors.textPrimary },
 });

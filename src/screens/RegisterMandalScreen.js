@@ -28,7 +28,7 @@ export default function RegisterMandalScreen({ navigation }) {
             const res = await api.post('/mandals', form);
             const mandalId = res.data.data._id;
             toast.success(`${form.ganpatiTitle} has been registered.`, 'Mandal Registered');
-            setTimeout(() => navigation.replace('MandalDetails', { mandalId }), 1200);
+            setTimeout(() => navigation.navigate('MandalDetails', { mandalId }), 1200);
         } catch (err) {
             toast.error(err?.response?.data?.message || 'Failed to register mandal.');
         } finally {

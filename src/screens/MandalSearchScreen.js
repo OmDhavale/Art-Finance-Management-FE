@@ -8,8 +8,10 @@ import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing, Shadow, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
+import { useAuth } from '../context/AuthContext';
 
 export default function MandalSearchScreen({ navigation }) {
+    const { user } = useAuth();
     const [allMandals, setAllMandals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -32,7 +34,7 @@ export default function MandalSearchScreen({ navigation }) {
         }
     }, []);
 
-    useEffect(() => { fetchMandals(); }, []);
+    useEffect(() => { fetchMandals(); }, [user?.plan]);
 
     // Filter with search + grade
     const filtered = allMandals.filter(m => {
@@ -141,6 +143,8 @@ export default function MandalSearchScreen({ navigation }) {
                             expanded={expanded === item._id}
                             onToggle={() => setExpanded(prev => prev === item._id ? null : item._id)}
                             onPressDetails={() => navigation.navigate('MandalDetails', { mandalId: item._id })}
+                            plan={user?.plan}
+                            onUpgrade={() => navigation.navigate('UpgradePlan')}
                         />
                     )}
                 />
@@ -149,9 +153,10 @@ export default function MandalSearchScreen({ navigation }) {
     );
 }
 
-function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails }) {
+function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails, plan, onUpgrade }) {
+    const isFree = plan !== 'PRO';
     const scale = useRef(new Animated.Value(1)).current;
-    const ogCfg = mandal.overallGrade ? getOverallGradeConfig(mandal.overallGrade) : null;
+    const ogCfg = !isFree && mandal.overallGrade ? getOverallGradeConfig(mandal.overallGrade) : null;
 
     const onIn = () => Animated.spring(scale, { toValue: 0.985, useNativeDriver: true, speed: 40 }).start();
     const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
@@ -173,7 +178,23 @@ function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails }) {
                         </Text>
                     </View>
                     <View style={styles.cardRight}>
-                        {ogCfg ? (
+                        {isFree ? (
+                            <View style={styles.restrictedGlimpse}>
+                                {mandal.overallGrade && ['B', 'C', 'D'].includes(mandal.overallGrade) ? (
+                                    <View style={styles.warningPill}>
+                                        <Text style={styles.glimpseWarning}>⚠️ Past dues?</Text>
+                                    </View>
+                                ) : mandal.overallGrade ? (
+                                    <View style={styles.clearPill}>
+                                        <Text style={styles.glimpseClear}>✅ Clear record</Text>
+                                    </View>
+                                ) : null}
+                                <TouchableOpacity onPress={onUpgrade} style={styles.proBadgeInline}>
+                                    <Feather name="lock" size={10} color={Colors.primary} />
+                                    <Text style={styles.proBadgeTextInline}>UPGRADE</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : ogCfg ? (
                             <View style={[styles.overallBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
                                 <Text style={[styles.overallBadgeText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
                             </View>
@@ -182,51 +203,65 @@ function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails }) {
                                 <Text style={[styles.overallBadgeText, { color: Colors.textMuted }]}>–</Text>
                             </View>
                         )}
-                        <Text style={styles.totalPending}>
-                            {mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'Clear'}
-                        </Text>
+                        {!isFree && (
+                            <Text style={styles.totalPending}>
+                                {mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'Clear'}
+                            </Text>
+                        )}
                     </View>
                 </View>
             </TouchableOpacity>
 
             {expanded && (
                 <View style={styles.breakdown}>
-                    <View style={styles.breakdownHeader}>
-                        <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
-                        <TouchableOpacity onPress={onPressDetails}>
-                            <Text style={styles.detailsLink}>Full Details →</Text>
-                        </TouchableOpacity>
-                    </View>
-                    {mandal.bookingSummary?.length > 0 ? (
-                        mandal.bookingSummary.map((b, i) => {
-                            const gc = getGradeConfig(b.remainingAmount);
-                            const rawR = b.remainingAmount;
-                            const dispR = Math.max(0, rawR);
-                            const extra = rawR < 0 ? Math.abs(rawR) : 0;
-                            return (
-                                <View key={i} style={styles.breakdownRow}>
-                                    <View style={styles.breakdownLeft}>
-                                        <Text style={styles.breakdownYear}>{b.year}</Text>
-                                        <Text style={styles.breakdownName}>{b.vendorName}</Text>
-                                        {b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
-                                    </View>
-                                    <View style={styles.breakdownRight}>
-                                        <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                            <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
-                                        </View>
-                                        <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                            ₹{dispR.toLocaleString()}
-                                        </Text>
-                                        <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
-                                        {extra > 0 && (
-                                            <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
-                                        )}
-                                    </View>
-                                </View>
-                            );
-                        })
+                    {isFree ? (
+                        <View style={styles.restrictedBox}>
+                            <Feather name="lock" size={24} color={Colors.textMuted} style={{ marginBottom: 8 }} />
+                            <Text style={styles.restrictedText}>Upgrade to PRO to view Mandal payment history and risk alerts.</Text>
+                            <TouchableOpacity style={styles.upgradeBtnSmall} onPress={onUpgrade}>
+                                <Text style={styles.upgradeBtnTextSmall}>Upgrade Now</Text>
+                            </TouchableOpacity>
+                        </View>
                     ) : (
-                        <Text style={styles.emptyBreakdown}>No booking history available.</Text>
+                        <>
+                        <View style={styles.breakdownHeader}>
+                            <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
+                            <TouchableOpacity onPress={onPressDetails}>
+                                <Text style={styles.detailsLink}>Full Details →</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {mandal.bookingSummary?.length > 0 ? (
+                            mandal.bookingSummary.map((b, i) => {
+                                const gc = getGradeConfig(b.remainingAmount);
+                                const rawR = b.remainingAmount;
+                                const dispR = Math.max(0, rawR);
+                                const extra = rawR < 0 ? Math.abs(rawR) : 0;
+                                return (
+                                    <View key={i} style={styles.breakdownRow}>
+                                        <View style={styles.breakdownLeft}>
+                                            <Text style={styles.breakdownYear}>{b.year}</Text>
+                                            <Text style={styles.breakdownName}>{b.vendorName}</Text>
+                                            {b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
+                                        </View>
+                                        <View style={styles.breakdownRight}>
+                                            <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                            </View>
+                                            <Text style={[styles.breakdownAmt, { color: gc.color }]}>
+                                                ₹{dispR.toLocaleString()}
+                                            </Text>
+                                            <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                            {extra > 0 && (
+                                                <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                );
+                            })
+                        ) : (
+                            <Text style={styles.emptyBreakdown}>No booking history available.</Text>
+                        )}
+                        </>
                     )}
                 </View>
             )}
@@ -307,4 +342,20 @@ const styles = StyleSheet.create({
     breakdownAmtLabel: { fontSize: 9, color: Colors.textMuted, marginTop: -2 },
     breakdownExtra: { fontSize: 10, color: Colors.success, fontWeight: '700', marginTop: 2 },
     emptyBreakdown: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', fontStyle: 'italic', paddingVertical: 10 },
+
+    proBadgeInline: {
+        backgroundColor: '#F9731615', flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 4,
+        borderWidth: 1, borderColor: '#F9731630',
+    },
+    proBadgeTextInline: { fontSize: 10, fontWeight: '900', color: Colors.primary },
+    restrictedGlimpse: { alignItems: 'flex-end', gap: 4 },
+    glimpseWarning: { fontSize: 8, fontWeight: '800', color: Colors.danger },
+    glimpseClear: { fontSize: 8, fontWeight: '800', color: Colors.success },
+    warningPill: { backgroundColor: '#FEF2F2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: 2 },
+    clearPill: { backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: 2 },
+    restrictedBox: { alignItems: 'center', paddingVertical: Spacing.xl, paddingHorizontal: Spacing.md },
+    restrictedText: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', lineHeight: 18, marginBottom: 12 },
+    upgradeBtnSmall: { backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.md },
+    upgradeBtnTextSmall: { fontSize: 11, fontWeight: '700', color: Colors.white },
 });

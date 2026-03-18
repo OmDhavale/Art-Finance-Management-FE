@@ -12,7 +12,7 @@ import { toast } from '../utils/toast';
 import ScreenHeader from '../components/ScreenHeader';
 
 export default function WorkshopDetailsScreen({ navigation }) {
-    const { user } = useAuth();
+    const { user, setUser } = useAuth();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -97,6 +97,34 @@ export default function WorkshopDetailsScreen({ navigation }) {
                         </View>
                     </View>
 
+                    {/* My Plan Section */}
+                    <View style={styles.planCard}>
+                        <View style={styles.planHeader}>
+                            <View>
+                                <Text style={styles.planLabel}>MY PLAN</Text>
+                                <View style={styles.planNameRow}>
+                                    <Text style={styles.planName}>{user?.plan === 'PRO' ? 'PRO Plan' : 'FREE Plan'}</Text>
+                                    <View style={[styles.planStatusBadge, user?.plan === 'PRO' ? styles.proBadge : styles.freeBadge]}>
+                                        <Text style={styles.planStatusText}>{user?.plan || 'FREE'}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.switchBtn, user?.plan === 'PRO' ? styles.switchBtnFree : styles.switchBtnPro]} 
+                                onPress={() => navigation.navigate('UpgradePlan')}
+                            >
+                                <Text style={styles.switchBtnText}>
+                                    {user?.plan === 'PRO' ? 'Manage Plan' : 'Upgrade to PRO'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.planDesc}>
+                            {user?.plan === 'PRO' 
+                                ? 'Enjoying unlimited bookings and full analytics.' 
+                                : 'Limited to 15 bookings/year. Unlock PRO for full history.'}
+                        </Text>
+                    </View>
+
                     {/* Management Section */}
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>MANAGEMENT TEAM</Text>
@@ -106,36 +134,48 @@ export default function WorkshopDetailsScreen({ navigation }) {
                     </View>
 
                     {/* Manager List */}
-                    {managers?.length > 0 ? (
-                        managers.map((m, idx) => (
-                            <View key={m._id} style={styles.managerItem}>
-                                <View style={styles.managerIcon}>
-                                    <Feather name="user" size={18} color={Colors.textSecondary} />
-                                </View>
-                                <View style={styles.managerInfo}>
-                                    <Text style={styles.managerName}>{m.name}</Text>
-                                    <Text style={styles.managerPhone}>{m.phone}</Text>
-                                </View>
-                                <View style={styles.managerTag}>
-                                    <Text style={styles.managerTagText}>MANAGER</Text>
-                                </View>
-                            </View>
-                        ))
-                    ) : (
-                        <View style={styles.emptyCard}>
-                            <Text style={styles.emptyText}>No managers added yet.</Text>
+                    {user?.plan === 'FREE' ? (
+                        <View style={styles.restrictedManagers}>
+                            <Feather name="lock" size={24} color={Colors.textMuted} />
+                            <Text style={styles.restrictedText}>Upgrade to PRO to add managers and staff to your workshop.</Text>
+                            <TouchableOpacity style={styles.upgradeBtnSmall} onPress={() => navigation.navigate('UpgradePlan')}>
+                                <Text style={styles.upgradeBtnTextSmall}>Upgrade to PRO</Text>
+                            </TouchableOpacity>
                         </View>
-                    )}
+                    ) : (
+                        <>
+                        {managers?.length > 0 ? (
+                            managers.map((m, idx) => (
+                                <View key={m._id} style={styles.managerItem}>
+                                    <View style={styles.managerIcon}>
+                                        <Feather name="user" size={18} color={Colors.textSecondary} />
+                                    </View>
+                                    <View style={styles.managerInfo}>
+                                        <Text style={styles.managerName}>{m.name}</Text>
+                                        <Text style={styles.managerPhone}>{m.phone}</Text>
+                                    </View>
+                                    <View style={styles.managerTag}>
+                                        <Text style={styles.managerTagText}>MANAGER</Text>
+                                    </View>
+                                </View>
+                            ))
+                        ) : (
+                            <View style={styles.emptyCard}>
+                                <Text style={styles.emptyText}>No managers added yet.</Text>
+                            </View>
+                        )}
 
-                    {/* Add Manager Button (Owners only) */}
-                    {isOwner && (
-                        <TouchableOpacity
-                            style={styles.addBtn}
-                            onPress={() => navigation.navigate('AddManager')}
-                        >
-                            <Feather name="plus" size={20} color={Colors.white} />
-                            <Text style={styles.addBtnText}>Add New Manager</Text>
-                        </TouchableOpacity>
+                        {/* Add Manager Button (Owners only) */}
+                        {isOwner && (
+                            <TouchableOpacity
+                                style={styles.addBtn}
+                                onPress={() => navigation.navigate('AddManager')}
+                            >
+                                <Feather name="plus" size={20} color={Colors.white} />
+                                <Text style={styles.addBtnText}>Add New Manager</Text>
+                            </TouchableOpacity>
+                        )}
+                        </>
                     )}
                 </Animated.View>
             </ScrollView>
@@ -218,4 +258,31 @@ const styles = StyleSheet.create({
         padding: Spacing.md, marginTop: Spacing.xl, gap: 8, ...Shadow.md,
     },
     addBtnText: { color: Colors.white, fontSize: Font.md, fontWeight: '700' },
+    restrictedManagers: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.xl,
+        alignItems: 'center', marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder,
+        borderStyle: 'dashed', ...Shadow.sm,
+    },
+    restrictedText: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 18, marginBottom: 15 },
+    upgradeBtnSmall: { backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.sm },
+    upgradeBtnTextSmall: { color: Colors.white, fontWeight: '700', fontSize: 11 },
+
+    // Plan Card Styles
+    planCard: {
+        backgroundColor: Colors.card, borderRadius: Radius.xl, padding: Spacing.xl,
+        ...Shadow.md, marginBottom: Spacing.xl, borderWidth: 1, borderColor: '#33415510',
+    },
+    planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    planLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1 },
+    planNameRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    planName: { fontSize: Font.md, fontWeight: '800', color: Colors.textPrimary, marginRight: 8 },
+    planStatusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+    proBadge: { backgroundColor: Colors.primary + '15' },
+    freeBadge: { backgroundColor: '#F1F5F9' },
+    planStatusText: { fontSize: 9, fontWeight: '800', color: Colors.primary },
+    planDesc: { fontSize: Font.xs, color: Colors.textSecondary, lineHeight: 18 },
+    switchBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.md, ...Shadow.sm },
+    switchBtnPro: { backgroundColor: Colors.primary },
+    switchBtnFree: { backgroundColor: '#334155' },
+    switchBtnText: { color: Colors.white, fontSize: 11, fontWeight: '700' },
 });
