@@ -66,20 +66,23 @@ export const Shadow = {
 };
 
 export const gradeConfig = {
-    excellent: { color: '#15803D', bg: '#DCFCE7', label: 'Fully Paid' },
-    green: { color: Colors.success, bg: Colors.successBg, label: 'Fully Paid' },
-    yellow: { color: Colors.warning, bg: Colors.warningBg, label: 'Almost Done' },
-    orange: { color: Colors.orange, bg: Colors.orangeBg, label: 'Partial' },
-    red: { color: Colors.danger, bg: Colors.dangerBg, label: 'Due' },
+    O: { color: '#15803D', bg: '#DCFCE7', label: 'O Grade' },
+    A: { color: Colors.success, bg: Colors.successBg, label: 'A Grade' },
+    B: { color: Colors.warning, bg: Colors.warningBg, label: 'B Grade' },
+    C: { color: Colors.orange, bg: Colors.orangeBg, label: 'C Grade' },
+    D: { color: Colors.danger, bg: Colors.dangerBg, label: 'D Grade' },
 };
 
 /** Compute grade config live from remainingAmount — bypasses stale DB grade. */
-export const getGradeConfig = (remainingAmount) => {
-    if (remainingAmount < 0) return gradeConfig.excellent;
-    if (remainingAmount === 0) return gradeConfig.green;
-    if (remainingAmount < 10000) return gradeConfig.yellow;
-    if (remainingAmount < 50000) return gradeConfig.orange;
-    return gradeConfig.red;
+export const getGradeConfig = (remainingAmount, finalPrice = 0) => {
+    if (remainingAmount < 0) return gradeConfig.O;
+    if (remainingAmount === 0) return gradeConfig.A;
+    if (!finalPrice || finalPrice <= 0) return gradeConfig.D;
+
+    const ratio = remainingAmount / finalPrice;
+    if (ratio <= 0.4) return gradeConfig.B;
+    if (ratio <= 0.8) return gradeConfig.C;
+    return gradeConfig.D;
 };
 
 /**

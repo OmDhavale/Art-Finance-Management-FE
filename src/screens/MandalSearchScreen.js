@@ -232,7 +232,7 @@ function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails, plan,
                         </View>
                         {mandal.bookingSummary?.length > 0 ? (
                             mandal.bookingSummary.map((b, i) => {
-                                const gc = getGradeConfig(b.remainingAmount);
+                                const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
                                 const rawR = b.remainingAmount;
                                 const dispR = Math.max(0, rawR);
                                 const extra = rawR < 0 ? Math.abs(rawR) : 0;

@@ -623,7 +623,7 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
                 <View style={styles.breakdown}>
                     <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
                         {mandal.bookingSummary.map((b, i) => {
-                            const gc = getGradeConfig(b.remainingAmount);
+                            const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
                             const rawR = b.remainingAmount;
                             const dispR = Math.max(0, rawR);
                             const extra = rawR < 0 ? Math.abs(rawR) : 0;

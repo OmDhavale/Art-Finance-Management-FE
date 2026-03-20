@@ -7,7 +7,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
-import { Colors, Font, Radius, Spacing, Shadow, getGradeConfig, getOverallGradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, Shadow, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 import { useAuth } from '../context/AuthContext';
 
