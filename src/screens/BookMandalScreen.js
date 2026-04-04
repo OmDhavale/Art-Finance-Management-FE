@@ -258,7 +258,11 @@ export default function BookMandalScreen({ navigation }) {
                                                             <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
                                                         </View>
                                                         <Text style={[styles.historyPending, { color: gc.color }]}>
-                                                            ₹{b.remainingAmount.toLocaleString()} due
+                                                            {(() => {
+                                                                const amt = Math.max(0, b.remainingAmount || 0);
+                                                                const pct = (b.finalPrice || 0) > 0 ? Math.round((amt / b.finalPrice) * 100) : 0;
+                                                                return `${pct}% due`;
+                                                            })()}
                                                         </Text>
                                                     </View>
                                                 </View>
@@ -612,7 +616,13 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
                             </Text>
                         )}
                         <Text style={[styles.totalPending, isDisabled && { color: Colors.textMuted }]}>
-                            {isFree ? 'Upgrade to view' : mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'All clear'}
+                            {(() => {
+                                if (isFree) return 'Upgrade to view';
+                                if (!mandal.totalPending || mandal.totalPending <= 0) return 'All clear';
+                                const totalFinal = (mandal.bookingSummary || []).reduce((sum, b) => sum + (b.finalPrice || 0), 0);
+                                const pct = totalFinal > 0 ? Math.round((mandal.totalPending / totalFinal) * 100) : 0;
+                                return `${pct}% due`;
+                            })()}
                         </Text>
                     </View>
                 </View>
@@ -648,11 +658,16 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
                                                     <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
                                                 </View>
                                                 <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                                    ₹{dispR.toLocaleString()}
+                                                    {(() => {
+                                                        const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
+                                                        return `${pct}%`;
+                                                    })()}
                                                 </Text>
                                                 <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
                                                 {extra > 0 && (
-                                                    <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
+                                                    <Text style={styles.breakdownExtra}>
+                                                        +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                                    </Text>
                                                 )}
                                             </>
                                         )}

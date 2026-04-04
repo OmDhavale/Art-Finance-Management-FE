@@ -205,7 +205,12 @@ function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails, plan,
                         )}
                         {!isFree && (
                             <Text style={styles.totalPending}>
-                                {mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'Clear'}
+                                {(() => {
+                                    if (!mandal.totalPending || mandal.totalPending <= 0) return 'Clear';
+                                    const totalFinal = (mandal.bookingSummary || []).reduce((sum, b) => sum + (b.finalPrice || 0), 0);
+                                    const pct = totalFinal > 0 ? Math.round((mandal.totalPending / totalFinal) * 100) : 0;
+                                    return `${pct}% due`;
+                                })()}
                             </Text>
                         )}
                     </View>
@@ -248,11 +253,16 @@ function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails, plan,
                                                 <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
                                             </View>
                                             <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                                ₹{dispR.toLocaleString()}
+                                                {(() => {
+                                                    const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
+                                                    return `${pct}%`;
+                                                })()}
                                             </Text>
                                             <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
                                             {extra > 0 && (
-                                                <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
+                                                <Text style={styles.breakdownExtra}>
+                                                    +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                                </Text>
                                             )}
                                         </View>
                                     </View>

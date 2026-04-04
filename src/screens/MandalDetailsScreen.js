@@ -346,11 +346,17 @@ export default function MandalDetailsScreen({ route, navigation }) {
                                                         </Text>
                                                     </View>
                                                     <Text style={[styles.historyAmount, !isFullyPaid && { color: Colors.danger }]}>
-                                                        ₹{Math.max(0, remaining).toLocaleString()}
+                                                        {(() => {
+                                                            const amt = Math.max(0, remaining);
+                                                            const pct = (item.finalPrice || 0) > 0 ? Math.round((amt / item.finalPrice) * 100) : 0;
+                                                            return `${pct}%`;
+                                                        })()}
                                                     </Text>
                                                     <Text style={styles.amountLabel}>{isFullyPaid ? 'paid' : 'due'}</Text>
                                                     {extra > 0 && (
-                                                        <Text style={styles.extraText}>+₹{extra.toLocaleString()} extra</Text>
+                                                        <Text style={styles.extraText}>
+                                                            +{Math.round((extra / (item.finalPrice || 1)) * 100)}% extra
+                                                        </Text>
                                                     )}
                                                 </View>
                                             </View>
