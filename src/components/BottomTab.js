@@ -4,8 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import { Colors, Shadow, Radius, Spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
-const TAB_COUNT = 5;
-const TAB_WIDTH = width / TAB_COUNT;
 const BAR_HEIGHT = Platform.OS === 'ios' ? 90 : 70;
 const HIGHLIGHT_HEIGHT = 52;
 const BOTTOM_INSET = Platform.OS === 'ios' ? 25 : 0;
@@ -14,21 +12,29 @@ export default function BottomTab({ state, descriptors, navigation }) {
     // These are the main tabs we want to show in the UI
     const mainTabs = [
         { name: 'Dashboard', label: 'Home', iconName: 'home' },
-        { name: 'SearchMandal', label: 'Search', iconName: 'search' },
+        //{ name: 'SearchMandal', label: 'Search', iconName: 'search' },
         { name: 'BookMandal', label: 'Book', iconName: 'plus-circle' },
         { name: 'MyBookings', label: 'My All', iconName: 'book-open' },
         { name: 'WorkshopDetails', label: 'Workshop', iconName: 'briefcase' },
     ];
 
+    const tabWidth = width / mainTabs.length;
     const translateX = useRef(new Animated.Value(0)).current;
 
+    const activeVisualIndex = mainTabs.findIndex(t => {
+        const rIndex = state.routes.findIndex(r => r.name === t.name);
+        return rIndex === state.index;
+    });
+
     useEffect(() => {
-        Animated.spring(translateX, {
-            toValue: state.index * TAB_WIDTH,
-            useNativeDriver: true,
-            bounciness: 3,
-        }).start();
-    }, [state.index]);
+        if (activeVisualIndex !== -1) {
+            Animated.spring(translateX, {
+                toValue: activeVisualIndex * tabWidth,
+                useNativeDriver: true,
+                bounciness: 3,
+            }).start();
+        }
+    }, [activeVisualIndex, tabWidth]);
 
     const highlightTop = (BAR_HEIGHT - BOTTOM_INSET - HIGHLIGHT_HEIGHT) / 2;
 
@@ -41,7 +47,7 @@ export default function BottomTab({ state, descriptors, navigation }) {
                     {
                         top: highlightTop,
                         height: HIGHLIGHT_HEIGHT,
-                        width: TAB_WIDTH - Spacing.lg,
+                        width: tabWidth - Spacing.lg,
                         transform: [{ translateX: Animated.add(translateX, Spacing.lg / 2) }],
                     }
                 ]}

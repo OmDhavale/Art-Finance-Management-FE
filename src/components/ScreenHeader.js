@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Font, Spacing, Shadow } from '../theme';
 
 export default function ScreenHeader({ title, onBack, rightElement }) {
@@ -13,7 +15,21 @@ export default function ScreenHeader({ title, onBack, rightElement }) {
                         <Feather name="chevron-left" size={22} color={Colors.textPrimary} />
                     </TouchableOpacity>
                 ) : <View style={styles.placeholder} />}
-                <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                <MaskedView
+                    style={{ flex: 1, height: 32 }}
+                    maskElement={
+                        <Text style={[styles.title, { flex: 1, height: 32, lineHeight: 32, backgroundColor: 'transparent' }]} numberOfLines={1}>
+                            {title}
+                        </Text>
+                    }
+                >
+                    <LinearGradient
+                        colors={['#F97316', '#3B82F6']}
+                        start={{ x: 0.1, y: 0 }}
+                        end={{ x: 0.9, y: 0 }}
+                        style={{ flex: 1 }}
+                    />
+                </MaskedView>
                 {rightElement ? rightElement : <View style={styles.placeholder} />}
             </View>
         </View>

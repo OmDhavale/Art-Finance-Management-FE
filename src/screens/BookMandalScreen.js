@@ -23,6 +23,7 @@ export default function BookMandalScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [query, setQuery] = useState('');
+    const [isGuideExpanded, setIsGuideExpanded] = useState(false);
     const [selectedMandal, setSelectedMandal] = useState(null);
     const [expanded, setExpanded] = useState(null); // mandalId of expanded card
     const [booking, setBooking] = useState({
@@ -100,7 +101,7 @@ export default function BookMandalScreen({ navigation }) {
             // Frontend safety check for FREE users (Backend also enforces this)
             if (user?.plan === 'FREE') {
                 const currentYear = new Date().getFullYear();
-                const res = await api.get('/bookings/my'); 
+                const res = await api.get('/bookings/my');
                 // Actually, let's just let the backend handle the error and catch it here.
                 // The backend returns a specific message.
             }
@@ -176,7 +177,7 @@ export default function BookMandalScreen({ navigation }) {
                         {selectedMandal?.overallGrade ? (() => {
                             const ogCfg = getOverallGradeConfig(selectedMandal.overallGrade);
                             const isFree = user?.plan === 'FREE';
-                            
+
                             return ogCfg ? (
                                 <View style={styles.selectedGradeRow}>
                                     {isFree ? (
@@ -425,75 +426,99 @@ export default function BookMandalScreen({ navigation }) {
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader title="Book Mandal" onBack={() => navigation.goBack()} />
 
-            {/* Search bar */}
-            <View style={styles.searchWrap}>
-                <TextInput
-                    style={styles.searchInput}
-                    value={query}
-                    onChangeText={setQuery}
-                    placeholder="Filter by title, name, area..."
-                    placeholderTextColor={Colors.textMuted}
-                />
-                {query.length > 0 && (
-                    <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
-                        <Text style={styles.clearText}>×</Text>
-                    </TouchableOpacity>
-                )}
+            {/* Search row with Filter toggle */}
+            <View style={styles.searchRow}>
+                <View style={styles.searchWrap}>
+                    <Feather name="search" size={18} color={Colors.textMuted} style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        value={query}
+                        onChangeText={setQuery}
+                        placeholder="Search title, name, area..."
+                        placeholderTextColor={Colors.textMuted}
+                    />
+                    {query.length > 0 && (
+                        <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
+                            <Feather name="x-circle" size={18} color={Colors.textMuted} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+                <TouchableOpacity
+                    style={[styles.filterToggleBtn, isGuideExpanded && styles.filterToggleBtnActive]}
+                    onPress={() => setIsGuideExpanded(!isGuideExpanded)}
+                >
+                    <Feather name="filter" size={20} color={isGuideExpanded ? Colors.white : Colors.textPrimary} />
+                </TouchableOpacity>
             </View>
 
-            {/* Status + Grade filter chips */}
-            <View style={styles.filterSection}>
-                {/* Row 1: Booking status */}
-                <View style={styles.filterRow}>
-                    {[['all', 'All'], ['available', 'Available'], ['booked', 'Booked']].map(([val, label]) => (
-                        <TouchableOpacity
-                            key={val}
-                            style={[styles.filterChip, statusFilter === val && styles.filterChipActive]}
-                            onPress={() => setStatusFilter(val)}
-                        >
-                            <Text style={[styles.filterChipText, statusFilter === val && styles.filterChipTextActive]}>
-                                {label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                {/* Row 2: Grade filter */}
-                <View style={styles.filterRow}>
-                    <TouchableOpacity
-                        style={[styles.filterChip, gradeFilter === 'all' && styles.filterChipActive]}
-                        onPress={() => setGradeFilter('all')}
-                    >
-                        <Text style={[styles.filterChipText, gradeFilter === 'all' && styles.filterChipTextActive]}>Any Grade</Text>
-                    </TouchableOpacity>
-                    {Object.entries(overallGradeConfig).map(([key, cfg]) => (
-                        <TouchableOpacity
-                            key={key}
-                            style={[
-                                styles.filterChip,
-                                gradeFilter === key && { backgroundColor: cfg.bg, borderColor: cfg.borderColor },
-                            ]}
-                            onPress={() => setGradeFilter(prev => prev === key ? 'all' : key)}
-                        >
-                            <Text style={[
-                                styles.filterChipText,
-                                gradeFilter === key && { color: cfg.color, fontWeight: '800' },
-                            ]}>{cfg.label}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
+            {/* Collapsible Dropdown for Filters */}
+            {isGuideExpanded && (
+                <View style={styles.dropdownFiltersContainer}>
 
-            {/* Grade legend */}
-            <View style={styles.legendRow}>
-                {Object.entries(overallGradeConfig).map(([key, cfg]) => (
-                    <View key={key} style={styles.legendItem}>
-                        <View style={[styles.legendBadge, { backgroundColor: cfg.bg, borderColor: cfg.borderColor }]}>
-                            <Text style={[styles.legendBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+                    {/* Status + Grade filter chips */}
+                    <View style={styles.filterSection}>
+                        {/* Row 1: Booking status */}
+                        <View style={styles.filterRow}>
+                            {[['all', 'All'], ['available', 'Available'], ['booked', 'Booked']].map(([val, label]) => (
+                                <TouchableOpacity
+                                    key={val}
+                                    style={[styles.filterChip, statusFilter === val && styles.filterChipActive]}
+                                    onPress={() => setStatusFilter(val)}
+                                >
+                                    <Text style={[styles.filterChipText, statusFilter === val && styles.filterChipTextActive]}>
+                                        {label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
-                        <Text style={styles.legendLabel}>{cfg.fullLabel}</Text>
+                        {/* Row 2: Grade filter */}
+                        <View style={styles.filterRow}>
+                            <TouchableOpacity
+                                style={[styles.filterChip, gradeFilter === 'all' && styles.filterChipActive]}
+                                onPress={() => setGradeFilter('all')}
+                            >
+                                <Text style={[styles.filterChipText, gradeFilter === 'all' && styles.filterChipTextActive]}>Any Grade</Text>
+                            </TouchableOpacity>
+                            {Object.entries(overallGradeConfig).map(([key, cfg]) => (
+                                <TouchableOpacity
+                                    key={key}
+                                    style={[
+                                        styles.filterChip,
+                                        gradeFilter === key && { backgroundColor: cfg.bg, borderColor: cfg.borderColor },
+                                    ]}
+                                    onPress={() => {
+                                        if (user?.plan !== 'PRO') {
+                                            toast.error('Upgrade to PRO to filter by grade.');
+                                            return;
+                                        }
+                                        setGradeFilter(prev => prev === key ? 'all' : key);
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        {user?.plan !== 'PRO' && <Feather name="lock" size={10} color={gradeFilter === key ? cfg.color : Colors.textMuted} />}
+                                        <Text style={[
+                                            styles.filterChipText,
+                                            gradeFilter === key && { color: cfg.color, fontWeight: '800' },
+                                        ]}>{cfg.label}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
-                ))}
-            </View>
+
+                    {/* Grade legend */}
+                    <View style={styles.legendRow}>
+                        {Object.entries(overallGradeConfig).map(([key, cfg]) => (
+                            <View key={key} style={styles.legendItem}>
+                                <View style={[styles.legendBadge, { backgroundColor: cfg.bg, borderColor: cfg.borderColor }]}>
+                                    <Text style={[styles.legendBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+                                </View>
+                                <Text style={styles.legendLabel}>{cfg.fullLabel}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
 
             {loading ? (
                 <View style={styles.center}>
@@ -566,26 +591,24 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
         : currentYear;
 
     return (
-        <Animated.View style={[styles.card, isDisabled && styles.cardDisabled, { transform: [{ scale }] }]}>
-            {/* Booked banner — show all booked years from current onwards */}
-            {isDisabled && (
-                <View style={styles.bookedBanner}>
-                    <Text style={styles.bookedBannerText}>
-                        ✓ Already Booked for {bannerText}
-                    </Text>
-                </View>
-            )}
-
+        <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
             {/* Card header — tap to expand/collapse */}
             <TouchableOpacity onPress={onToggle} onPressIn={onIn} onPressOut={onOut} activeOpacity={1}>
-                <View style={[styles.cardHeader, isDisabled && styles.cardHeaderDisabled]}>
-                    <View style={[styles.cardInitial, isDisabled && styles.cardInitialDisabled]}>
-                        <Text style={[styles.cardInitialText, isDisabled && styles.cardInitialTextDisabled]}>
-                            {(mandal.ganpatiTitle || 'M').charAt(0).toUpperCase()}
-                        </Text>
+                <View style={styles.cardHeader}>
+                    <View style={{ alignItems: 'center', marginRight: Spacing.md, minWidth: 48, flexShrink: 0 }}>
+                        <View style={[styles.cardInitial, { marginRight: 0 }]}>
+                            <Text style={styles.cardInitialText}>
+                                {(mandal.ganpatiTitle || 'M').charAt(0).toUpperCase()}
+                            </Text>
+                        </View>
+                        {isDisabled && (
+                            <View style={[styles.inlineBookedTag, { alignSelf: 'center', marginTop: 4, marginBottom: 0, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }]}>
+                                <Text style={[styles.inlineBookedTagText, { fontSize: 9, textAlign: 'center' }]} numberOfLines={1}>Booked ✓</Text>
+                            </View>
+                        )}
                     </View>
                     <View style={styles.cardInfo}>
-                        <Text style={[styles.cardTitle, isDisabled && styles.cardTitleDisabled]} numberOfLines={1}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
                             {mandal.ganpatiTitle}
                         </Text>
                         <Text style={styles.cardSub} numberOfLines={1}>{mandal.mandalName}</Text>
@@ -600,22 +623,15 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
                                 <Feather name="lock" size={14} color={Colors.textMuted} />
                             </View>
                         ) : ogCfg ? (
-                            <View style={[styles.overallBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }, isDisabled && styles.badgeDisabled]}>
-                                <Text style={[styles.overallBadgeText, { color: ogCfg.color }, isDisabled && styles.badgeTextDisabled]}>{ogCfg.label}</Text>
+                            <View style={[styles.overallBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
+                                <Text style={[styles.overallBadgeText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
                             </View>
                         ) : (
                             <View style={[styles.overallBadge, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
                                 <Text style={[styles.overallBadgeText, { color: Colors.textMuted }]}>–</Text>
                             </View>
                         )}
-                        {ogCfg && !isDisabled && (
-                            <Text style={[styles.overallBadgeLabel, { color: ogCfg.color }]}>
-                                {isFree ? (
-                                    ['B', 'C', 'D'].includes(mandal.overallGrade) ? '⚠️ Potential dues' : '✅ Reliable'
-                                ) : ogCfg.fullLabel}
-                            </Text>
-                        )}
-                        <Text style={[styles.totalPending, isDisabled && { color: Colors.textMuted }]}>
+                        <Text style={styles.totalPending}>
                             {(() => {
                                 if (isFree) return 'Upgrade to view';
                                 if (!mandal.totalPending || mandal.totalPending <= 0) return 'All clear';
@@ -632,49 +648,49 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
             {expanded && mandal.bookingSummary?.length > 0 && (
                 <View style={styles.breakdown}>
                     <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
-                        {mandal.bookingSummary.map((b, i) => {
-                            const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
-                            const rawR = b.remainingAmount;
-                            const dispR = Math.max(0, rawR);
-                            const extra = rawR < 0 ? Math.abs(rawR) : 0;
-                            return (
-                                <View key={i} style={styles.breakdownRow}>
-                                    <View style={styles.breakdownLeft}>
-                                        <Text style={styles.breakdownYear}>{b.year}</Text>
-                                        <Text style={styles.breakdownVendor}>
-                                            {isFree ? '🔒 Hidden (PRO feature)' : b.vendorName}
-                                        </Text>
-                                        {!isFree && b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
-                                    </View>
-                                    <View style={styles.breakdownRight}>
-                                        {isFree ? (
-                                            <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')} style={styles.lockHint}>
-                                                <Feather name="lock" size={12} color={Colors.primary} />
-                                                <Text style={styles.lockHintText}>Unlock History</Text>
-                                            </TouchableOpacity>
-                                        ) : (
-                                            <>
-                                                <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                                    <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
-                                                </View>
-                                                <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                                    {(() => {
-                                                        const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
-                                                        return `${pct}%`;
-                                                    })()}
-                                                </Text>
-                                                <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
-                                                {extra > 0 && (
-                                                    <Text style={styles.breakdownExtra}>
-                                                        +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
-                                                    </Text>
-                                                )}
-                                            </>
-                                        )}
-                                    </View>
+                    {mandal.bookingSummary.map((b, i) => {
+                        const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
+                        const rawR = b.remainingAmount;
+                        const dispR = Math.max(0, rawR);
+                        const extra = rawR < 0 ? Math.abs(rawR) : 0;
+                        return (
+                            <View key={i} style={styles.breakdownRow}>
+                                <View style={styles.breakdownLeft}>
+                                    <Text style={styles.breakdownYear}>{b.year}</Text>
+                                    <Text style={styles.breakdownVendor}>
+                                        {isFree ? '🔒 Hidden (PRO feature)' : b.vendorName}
+                                    </Text>
+                                    {!isFree && b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
                                 </View>
-                            );
-                        })}
+                                <View style={styles.breakdownRight}>
+                                    {isFree ? (
+                                        <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')} style={styles.lockHint}>
+                                            <Feather name="lock" size={12} color={Colors.primary} />
+                                            <Text style={styles.lockHintText}>Unlock History</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <>
+                                            <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                            </View>
+                                            <Text style={[styles.breakdownAmt, { color: gc.color }]}>
+                                                {(() => {
+                                                    const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
+                                                    return `${pct}%`;
+                                                })()}
+                                            </Text>
+                                            <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                            {extra > 0 && (
+                                                <Text style={styles.breakdownExtra}>
+                                                    +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                                </Text>
+                                            )}
+                                        </>
+                                    )}
+                                </View>
+                            </View>
+                        );
+                    })}
                 </View>
             )}
 
@@ -742,13 +758,35 @@ const styles = StyleSheet.create({
     badgeTextDisabled: {},
     emptyText: { color: Colors.textMuted, fontSize: Font.sm, textAlign: 'center' },
 
-    searchWrap: {
+    searchRow: {
         flexDirection: 'row', alignItems: 'center',
-        marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs,
-        backgroundColor: Colors.inputBg, borderRadius: Radius.md,
-        borderWidth: 1.5, borderColor: Colors.inputBorder,
+        marginHorizontal: Spacing.lg, marginTop: Spacing.md, gap: 10,
+        marginBottom: Spacing.md,
+    },
+    searchWrap: {
+        flex: 1, flexDirection: 'row', alignItems: 'center',
+        backgroundColor: Colors.white, borderRadius: Radius.md,
+        borderWidth: 1, borderColor: Colors.cardBorder,
         paddingHorizontal: Spacing.md, ...Shadow.sm,
     },
+    searchIcon: { marginRight: 8 },
+    dropdownFiltersContainer: {
+        marginHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+        backgroundColor: Colors.white, borderRadius: Radius.md,
+        borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: Spacing.md,
+        ...Shadow.sm,
+    },
+    filterToggleBtn: {
+        width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.white,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    filterToggleBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    inlineBookedTag: {
+        backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2,
+        borderRadius: 4, alignSelf: 'flex-start', marginBottom: 2,
+    },
+    inlineBookedTagText: { fontSize: 9, fontWeight: '700', color: '#065F46' },
     searchInput: {
         flex: 1, height: 48, fontSize: Font.sm,
         color: Colors.textPrimary, paddingVertical: 0,

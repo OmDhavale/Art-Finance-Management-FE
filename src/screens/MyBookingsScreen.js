@@ -182,7 +182,7 @@ export default function MyBookingsScreen({ navigation }) {
                                 key={booking._id}
                                 booking={booking}
                                 isManager={isManager}
-                                onPress={() => navigation.navigate('MandalDetails', { mandalId: booking.mandalId?._id })}
+                                onPress={() => navigation.navigate('MandalDetails', { mandalId: booking.mandalId?._id, bookingYear: booking.year })}
                                 onPressAddPayment={() => navigation.navigate('AddPayment', {
                                     bookingId: booking._id,
                                     mandalName: [booking.mandalId?.ganpatiTitle, booking.mandalId?.mandalName].filter(Boolean).join(' – '),
