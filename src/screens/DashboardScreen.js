@@ -2,9 +2,9 @@ import React, { useRef, useEffect, useState } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
     SafeAreaView, Animated, StatusBar, ScrollView, Platform, RefreshControl,
-    ActivityIndicator, Image,
+    ActivityIndicator, Image, Linking,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
 import api from '../api/api';
@@ -150,9 +150,29 @@ export default function DashboardScreen({ navigation }) {
                     />
                 </View>
                 <Text style={styles.workshopName} numberOfLines={1}>{user?.workshopName || 'My Workshop'}</Text>
-                <TouchableOpacity onPress={logout} style={styles.signOutBtn}>
-                    <Feather name="log-out" size={17} color={Colors.primary} />
-                </TouchableOpacity>
+
+                <View style={styles.topActions}>
+                    <TouchableOpacity
+                        onPress={() => Linking.openURL('https://wa.me/9892783192')}
+                        style={styles.contactBtn}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <FontAwesome name="whatsapp" size={13} color="#16A34A" />
+                            <Text style={styles.contactText}>Contact Us</Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Onboarding')}
+                        style={styles.helpBtn}
+                    >
+                        <Feather name="help-circle" size={18} color={Colors.primary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={logout} style={styles.signOutBtn}>
+                        <Feather name="log-out" size={17} color={Colors.primary} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView
@@ -289,6 +309,20 @@ const styles = StyleSheet.create({
     },
     logoImageSmall: { width: 28, height: 28 },
     workshopName: { flex: 1, fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
+    topActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    contactBtn: {
+        backgroundColor: '#F0FDF4',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#DCFCE7'
+    },
+    contactText: { fontSize: 10, fontWeight: '800', color: '#16A34A' },
+    helpBtn: {
+        width: 34, height: 34, borderRadius: 17,
+        backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center',
+    },
     signOutBtn: {
         width: 34, height: 34, borderRadius: 17,
         backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center',
