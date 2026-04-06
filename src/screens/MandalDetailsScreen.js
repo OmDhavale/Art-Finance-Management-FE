@@ -49,7 +49,7 @@ function PaymentHealthBar({ remaining, finalPrice }) {
 }
 
 export default function MandalDetailsScreen({ route, navigation }) {
-    const { mandalId } = route.params;
+    const { mandalId, bookingYear } = route.params;
     const { user } = useAuth();
     const [mandal, setMandal] = useState(null);
     const [bookings, setBookings] = useState([]);
@@ -147,18 +147,21 @@ export default function MandalDetailsScreen({ route, navigation }) {
         );
     }
 
-    // Find the latest (most recent year) booking that belongs to me
+    // Find the specified year's booking (or fallback to latest) that belongs to me
     const isMyBooking = (item) =>
         item.vendorId?._id === user?._id ||
         (user?.role === 'manager' && item.vendorId?._id === user?.ownerId);
 
-    const myLatestBooking = [...bookings].sort((a, b) => b.year - a.year).find(isMyBooking);
+    const myLatestBooking = [...bookings]
+        .filter(isMyBooking)
+        .sort((a, b) => b.year - a.year)
+        .find(b => bookingYear ? b.year === bookingYear : true);
 
     return (
         <View style={styles.flex}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader
-                title={mandal?.ganpatiTitle || 'Mandal Details'}
+                title={mandal?.ganpatiTitle ? `${mandal.ganpatiTitle}${myLatestBooking?.year ? ` (${myLatestBooking.year})` : ''}` : 'Mandal Details'}
                 onBack={() => navigation.goBack()}
             />
 
@@ -174,7 +177,7 @@ export default function MandalDetailsScreen({ route, navigation }) {
                     <View style={styles.heroSection}>
                         <View style={styles.heroRow}>
                             <View style={styles.heroText}>
-                                <Text style={styles.heroTitle}>{mandal?.ganpatiTitle}</Text>
+                                <Text style={styles.heroTitle}>{mandal?.ganpatiTitle}{myLatestBooking?.year ? ` (${myLatestBooking.year})` : ''}</Text>
                                 {(mandal?.area || mandal?.city) ? (
                                     <View style={styles.locationRow}>
                                         <Feather name="map-pin" size={12} color={Colors.textMuted} />
@@ -292,12 +295,12 @@ export default function MandalDetailsScreen({ route, navigation }) {
 
                     {/* Older bookings listing */}
                     {user?.plan === 'FREE' ? (
-                         <View style={styles.restrictedSection}>
+                        <View style={styles.restrictedSection}>
                             <Feather name="lock" size={32} color={Colors.textMuted} />
                             <Text style={styles.restrictedTitle}>
                                 {mandal?.overallGrade && ['B', 'C', 'D'].includes(mandal.overallGrade) ? '⚠️ Potential past dues' : '✅ Reliable history'}
                             </Text>
-                            
+
                             {mandal?.bookingSummary?.length > 0 && (
                                 <View style={styles.glimpseYears}>
                                     <Text style={styles.glimpseYearsLabel}>BOOKED YEARS:</Text>
@@ -312,7 +315,7 @@ export default function MandalDetailsScreen({ route, navigation }) {
                             )}
 
                             <Text style={styles.restrictedSub}>Upgrade to PRO to see previous vendors, their detailed payment history, and Mandal grades.</Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.upgradeBtnLarge}
                                 onPress={() => navigation.navigate('UpgradePlan')}
                             >
@@ -390,10 +393,10 @@ export default function MandalDetailsScreen({ route, navigation }) {
                             <Text style={styles.footerActionText}>Edit Price</Text>
                         </TouchableOpacity>
                         <View style={styles.footerDivider} />
-                        <TouchableOpacity style={styles.footerActionBtn} onPress={handleCloseBooking}>
+                        {/* <TouchableOpacity style={styles.footerActionBtn} onPress={handleCloseBooking}>
                             <Feather name="lock" size={14} color={Colors.danger} />
                             <Text style={[styles.footerActionText, { color: Colors.danger }]}>Close Booking</Text>
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
                     </View>
                 </View>
             ) : (

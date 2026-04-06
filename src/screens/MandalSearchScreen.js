@@ -229,48 +229,48 @@ function MandalDirectoryCard({ mandal, expanded, onToggle, onPressDetails, plan,
                         </View>
                     ) : (
                         <>
-                        <View style={styles.breakdownHeader}>
-                            <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
-                            <TouchableOpacity onPress={onPressDetails}>
-                                <Text style={styles.detailsLink}>Full Details →</Text>
-                            </TouchableOpacity>
-                        </View>
-                        {mandal.bookingSummary?.length > 0 ? (
-                            mandal.bookingSummary.map((b, i) => {
-                                const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
-                                const rawR = b.remainingAmount;
-                                const dispR = Math.max(0, rawR);
-                                const extra = rawR < 0 ? Math.abs(rawR) : 0;
-                                return (
-                                    <View key={i} style={styles.breakdownRow}>
-                                        <View style={styles.breakdownLeft}>
-                                            <Text style={styles.breakdownYear}>{b.year}</Text>
-                                            <Text style={styles.breakdownName}>{b.vendorName}</Text>
-                                            {b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
-                                        </View>
-                                        <View style={styles.breakdownRight}>
-                                            <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                                <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                            <View style={styles.breakdownHeader}>
+                                <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
+                                <TouchableOpacity onPress={onPressDetails}>
+                                    <Text style={styles.detailsLink}>Full Details →</Text>
+                                </TouchableOpacity>
+                            </View>
+                            {mandal.bookingSummary?.length > 0 ? (
+                                mandal.bookingSummary.map((b, i) => {
+                                    const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
+                                    const rawR = b.remainingAmount;
+                                    const dispR = Math.max(0, rawR);
+                                    const extra = rawR < 0 ? Math.abs(rawR) : 0;
+                                    return (
+                                        <View key={i} style={styles.breakdownRow}>
+                                            <View style={styles.breakdownLeft}>
+                                                <Text style={styles.breakdownYear}>{b.year}</Text>
+                                                <Text style={styles.breakdownName}>{b.vendorName}</Text>
+                                                {b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
                                             </View>
-                                            <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                                {(() => {
-                                                    const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
-                                                    return `${pct}%`;
-                                                })()}
-                                            </Text>
-                                            <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
-                                            {extra > 0 && (
-                                                <Text style={styles.breakdownExtra}>
-                                                    +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                            <View style={styles.breakdownRight}>
+                                                <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                    <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                                </View>
+                                                <Text style={[styles.breakdownAmt, { color: gc.color }]}>
+                                                    {(() => {
+                                                        const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
+                                                        return `${pct}%`;
+                                                    })()}
                                                 </Text>
-                                            )}
+                                                <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                                {extra > 0 && (
+                                                    <Text style={styles.breakdownExtra}>
+                                                        +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                                    </Text>
+                                                )}
+                                            </View>
                                         </View>
-                                    </View>
-                                );
-                            })
-                        ) : (
-                            <Text style={styles.emptyBreakdown}>No booking history available.</Text>
-                        )}
+                                    );
+                                })
+                            ) : (
+                                <Text style={styles.emptyBreakdown}>No booking history available.</Text>
+                            )}
                         </>
                     )}
                 </View>

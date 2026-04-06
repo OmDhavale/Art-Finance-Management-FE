@@ -11,6 +11,7 @@ import MyBookingsScreen from '../screens/MyBookingsScreen';
 import PaymentLogsScreen from '../screens/PaymentLogsScreen';
 import WorkshopDetailsScreen from '../screens/WorkshopDetailsScreen';
 import UpgradePlanScreen from '../screens/UpgradePlanScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import AnimatedWrapper from '../components/AnimatedWrapper';
 import BottomTab from '../components/BottomTab';
 
@@ -43,6 +44,7 @@ export default function AppNavigator() {
             <Tab.Screen name="RegisterMandal" component={withAnimation(RegisterMandalScreen, 8)} />
             <Tab.Screen name="AddManager" component={withAnimation(AddManagerScreen, 9)} />
             <Tab.Screen name="UpgradePlan" component={withAnimation(UpgradePlanScreen, 10)} />
+            <Tab.Screen name="Onboarding" component={OnboardingScreen} />
         </Tab.Navigator>
     );
 }
