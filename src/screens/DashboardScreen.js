@@ -153,22 +153,11 @@ export default function DashboardScreen({ navigation }) {
 
                 <View style={styles.topActions}>
                     <TouchableOpacity
-                        onPress={() => Linking.openURL('https://wa.me/9892783192')}
-                        style={styles.contactBtn}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <FontAwesome name="whatsapp" size={13} color="#16A34A" />
-                            <Text style={styles.contactText}>Contact Us</Text>
-                        </View>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                         onPress={() => navigation.navigate('Onboarding')}
                         style={styles.helpBtn}
                     >
                         <Feather name="help-circle" size={18} color={Colors.primary} />
                     </TouchableOpacity>
-
                     <TouchableOpacity onPress={logout} style={styles.signOutBtn}>
                         <Feather name="log-out" size={17} color={Colors.primary} />
                     </TouchableOpacity>
@@ -277,10 +266,59 @@ export default function DashboardScreen({ navigation }) {
                                 <Text style={styles.emptyText}>No recent activity mixed with current year data.</Text>
                             </View>
                         )}
+
+                        {/* Account & Support Section */}
+                        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl + 10, marginBottom: Spacing.md }]}>ACCOUNT & SUPPORT</Text>
+                        
+                        <View style={styles.supportContainer}>
+                            <SupportRow 
+                                icon="help-circle" 
+                                title="App User Guide" 
+                                sub="How to use the application"
+                                onPress={() => navigation.navigate('Onboarding')}
+                            />
+                            <SupportRow 
+                                icon="whatsapp" 
+                                title="Contact Developer Support" 
+                                sub="WhatsApp us for any issues/bugs"
+                                iconType="fa"
+                                color="#16A34A"
+                                onPress={() => Linking.openURL('https://wa.me/9892783192')}
+                            />
+                            <SupportRow 
+                                icon="log-out" 
+                                title="Sign Out" 
+                                sub="Log out of your workshop account"
+                                color={Colors.danger}
+                                onPress={logout}
+                                hideChevron
+                            />
+                        </View>
+
+                        <Text style={styles.appVersion}>Version 1.0.4 • Proudly Made in India 🇮🇳</Text>
                     </Animated.View>
                 )}
             </ScrollView>
         </SafeAreaView>
+    );
+}
+
+function SupportRow({ icon, title, sub, onPress, iconType = 'feather', color = Colors.primary, hideChevron = false }) {
+    return (
+        <TouchableOpacity style={styles.supportRow} onPress={onPress} activeOpacity={0.7}>
+            <View style={[styles.supportIconWrap, { backgroundColor: color + '10' }]}>
+                {iconType === 'fa' ? (
+                    <FontAwesome name={icon} size={18} color={color} />
+                ) : (
+                    <Feather name={icon} size={18} color={color} />
+                )}
+            </View>
+            <View style={styles.supportTextWrap}>
+                <Text style={styles.supportTitle}>{title}</Text>
+                <Text style={styles.supportSub}>{sub}</Text>
+            </View>
+            {!hideChevron && <Feather name="chevron-right" size={16} color={Colors.textMuted} />}
+        </TouchableOpacity>
     );
 }
 
@@ -381,4 +419,12 @@ const styles = StyleSheet.create({
 
     emptyCard: { padding: Spacing.xl, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white, borderRadius: Radius.lg, borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.separator },
     emptyText: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '600' },
+
+    supportContainer: { backgroundColor: Colors.card, borderRadius: Radius.lg, ...Shadow.sm, overflow: 'hidden' },
+    supportRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.separator },
+    supportIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md },
+    supportTextWrap: { flex: 1 },
+    supportTitle: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
+    supportSub: { fontSize: 10, color: Colors.textMuted, marginTop: 1 },
+    appVersion: { textAlign: 'center', fontSize: 10, color: Colors.textMuted, marginTop: Spacing.xl, fontWeight: '600', letterSpacing: 0.5 },
 });

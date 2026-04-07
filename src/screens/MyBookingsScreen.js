@@ -18,7 +18,22 @@ export default function MyBookingsScreen({ navigation }) {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedYear, setSelectedYear] = useState(null);
+    const [isSearching, setIsSearching] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const searchAnim = useRef(new Animated.Value(0)).current;
+
+    const toggleSearch = (show) => {
+        setIsSearching(show);
+        Animated.spring(searchAnim, {
+            toValue: show ? 1 : 0,
+            useNativeDriver: false,
+            friction: 8,
+            tension: 40,
+        }).start();
+        if (!show) setSearchQuery('');
+    };
 
     // Edit price modal state
     const [editModal, setEditModal] = useState(null);
@@ -29,7 +44,15 @@ export default function MyBookingsScreen({ navigation }) {
         if (!isRefresh) setLoading(true);
         try {
             const res = await api.get('/bookings/my');
-            setBookings(res.data.data || []);
+            const data = res.data.data || [];
+            setBookings(data);
+
+            // Set initial selected year if not set
+            if (data.length > 0) {
+                const availableYears = [...new Set(data.map(b => String(b.year)))].sort((a, b) => b - a);
+                setSelectedYear(prev => prev || availableYears[0]);
+            }
+
             Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
         } catch {
             toast.error('Failed to load your bookings.');
@@ -86,13 +109,15 @@ export default function MyBookingsScreen({ navigation }) {
     };
 
     // Grouping and Stats
-    const grouped = bookings.reduce((acc, b) => {
-        const yr = b.year;
-        if (!acc[yr]) acc[yr] = [];
-        acc[yr].push(b);
-        return acc;
-    }, {});
-    const years = Object.keys(grouped).sort((a, b) => b - a);
+    const years = [...new Set(bookings.map(b => String(b.year)))].sort((a, b) => b - a);
+
+    const filteredBookings = bookings.filter(b => {
+        const matchesYear = !selectedYear || String(b.year) === selectedYear;
+        const matchesSearch = !searchQuery ||
+            b.mandalId?.ganpatiTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            b.mandalId?.mandalName?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesYear && matchesSearch;
+    });
 
     const lifetimeTotal = bookings.reduce((sum, b) => sum + (b.totalPaid || 0), 0);
     const totalPending = bookings.reduce((sum, b) => sum + Math.max(0, b.remainingAmount || 0), 0);
@@ -115,100 +140,160 @@ export default function MyBookingsScreen({ navigation }) {
 
             <Animated.FlatList
                 style={{ opacity: fadeAnim }}
-                data={years}
-                keyExtractor={yr => yr}
+                data={filteredBookings}
+                keyExtractor={item => item._id}
                 contentContainerStyle={styles.list}
                 refreshing={refreshing}
                 onRefresh={() => { setRefreshing(true); fetchBookings(true); }}
                 ListHeaderComponent={bookings.length > 0 ? (
-                    <View style={styles.summaryBanner}>
-                        {/* Lifetime Collection Row */}
-                        <View style={styles.mainStatRow}>
-                            <View>
-                                <Text style={styles.bannerLabelText}>LIFETIME COLLECTION</Text>
-                                <Text style={styles.bannerMainValue}>₹ {lifetimeTotal.toLocaleString()}</Text>
+                    <View>
+                        {/* Summary Banner */}
+                        <View style={styles.summaryBanner}>
+                            <View style={styles.mainStatRow}>
+                                <View>
+                                    <Text style={styles.bannerLabelText}>LIFETIME COLLECTION</Text>
+                                    <Text style={styles.bannerMainValue}>₹ {lifetimeTotal.toLocaleString()}</Text>
+                                </View>
+                                <View style={styles.bannerCircleIcon}>
+                                    <Feather name="award" size={24} color={Colors.white} />
+                                </View>
                             </View>
-                            <View style={styles.bannerCircleIcon}>
-                                <Feather name="award" size={24} color={Colors.white} />
+                            <View style={styles.bannerDivider} />
+                            <View style={styles.secondaryStatRow}>
+                                <View style={styles.statBox}>
+                                    <View style={styles.statHeaderRow}>
+                                        <Feather name="clock" size={12} color="rgba(255,255,255,0.7)" />
+                                        <Text style={styles.statLabelText}>PENDING</Text>
+                                    </View>
+                                    <Text style={styles.statValueText}>₹ {totalPending.toLocaleString()}</Text>
+                                </View>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statBox}>
+                                    <View style={styles.statHeaderRow}>
+                                        <Feather name="users" size={12} color="rgba(255,255,255,0.7)" />
+                                        <Text style={styles.statLabelText}>DUE MANDALS</Text>
+                                    </View>
+                                    <Text style={styles.statValueText}>{pendingMandalsCount} Mandals</Text>
+                                </View>
                             </View>
                         </View>
 
-                        {/* Summary Divider */}
-                        <View style={styles.bannerDivider} />
+                        <View style={styles.controlsRow}>
+                            {/* Year Selector / Animated Search Container */}
+                            <Animated.View style={{ 
+                                flex: 1, 
+                                marginRight: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
+                                opacity: searchAnim.interpolate({ inputRange: [0, 0.5], outputRange: [1, 0] }),
+                                transform: [{ translateX: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }]
+                            }}>
+                                {!isSearching && (
+                                    <View style={styles.yearSelectorWrapper}>
+                                        <Text style={styles.controlLabel}>SEASON</Text>
+                                        <FlatList
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            data={years}
+                                            keyExtractor={yr => yr}
+                                            renderItem={({ item: yr }) => (
+                                                <TouchableOpacity
+                                                    style={[styles.yearChip, selectedYear === yr && styles.yearChipActive]}
+                                                    onPress={() => setSelectedYear(yr)}
+                                                >
+                                                    <Text style={[styles.yearChipText, selectedYear === yr && styles.yearChipTextActive]}>
+                                                        {yr}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            )}
+                                            contentContainerStyle={styles.yearSelectorList}
+                                        />
+                                    </View>
+                                )}
+                            </Animated.View>
 
-                        {/* Secondary Stats Row */}
-                        <View style={styles.secondaryStatRow}>
-                            <View style={styles.statBox}>
-                                <View style={styles.statHeaderRow}>
-                                    <Feather name="clock" size={12} color="rgba(255,255,255,0.7)" />
-                                    <Text style={styles.statLabelText}>PENDING</Text>
-                                </View>
-                                <Text style={styles.statValueText}>₹ {totalPending.toLocaleString()}</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statBox}>
-                                <View style={styles.statHeaderRow}>
-                                    <Feather name="users" size={12} color="rgba(255,255,255,0.7)" />
-                                    <Text style={styles.statLabelText}>DUE MANDALS</Text>
-                                </View>
-                                <Text style={styles.statValueText}>{pendingMandalsCount} Mandals</Text>
-                            </View>
+                            {/* Search Toggle / Input */}
+                            <Animated.View style={[
+                                styles.searchWrapper,
+                                { 
+                                    width: searchAnim.interpolate({ inputRange: [0, 1], outputRange: ['12%', '100%'] }),
+                                    position: isSearching ? 'absolute' : 'relative',
+                                    right: 0, zIndex: 10
+                                }
+                            ]}>
+                                {isSearching ? (
+                                    <View style={styles.expandedSearch}>
+                                        <Feather name="search" size={18} color={Colors.primary} style={styles.inputIcon} />
+                                        <TextInput
+                                            style={styles.expandableInput}
+                                            placeholder="Search mandals..."
+                                            placeholderTextColor={Colors.textMuted}
+                                            value={searchQuery}
+                                            onChangeText={setSearchQuery}
+                                            autoFocus
+                                        />
+                                        <TouchableOpacity onPress={() => toggleSearch(false)} style={styles.closeSearchBtn}>
+                                            <Feather name="x" size={20} color={Colors.textSecondary} />
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity style={styles.searchIconButton} onPress={() => toggleSearch(true)}>
+                                        <Feather name="search" size={20} color={Colors.primary} />
+                                    </TouchableOpacity>
+                                )}
+                            </Animated.View>
+                        </View>
+                        
+                        <View style={styles.listHeaderRow}>
+                            <Text style={styles.listHeaderText}>
+                                {selectedYear} Season • {filteredBookings.length} Bookings
+                            </Text>
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <Text style={styles.clearFilterText}>Clear Filter</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 ) : null}
                 ListEmptyComponent={
                     <View style={styles.center}>
-                        <Text style={styles.emptyText}>No bookings yet.</Text>
-                        <Text style={styles.emptyHint}>Use "Book Mandal" to create your first booking.</Text>
+                        <Text style={styles.emptyText}>{searchQuery ? 'No results found' : 'No bookings yet.'}</Text>
+                        <Text style={styles.emptyHint}>
+                            {searchQuery ? 'Try a different search term.' : 'Use "Book Mandal" to create your first booking.'}
+                        </Text>
                     </View>
                 }
-                renderItem={({ item: yr }) => (
-                    <View style={styles.yearSection}>
-                        <View style={styles.yearHeader}>
-                            <View style={styles.yearLeft}>
-                                <Feather name="calendar" size={16} color={Colors.primary} />
-                                <Text style={styles.yearText}>Season {yr}</Text>
-                            </View>
-                            <View style={styles.yearRight}>
-                                <Text style={styles.yearTotalLabel}>COLLECTION</Text>
-                                <Text style={styles.yearTotalValue}>
-                                    ₹{grouped[yr].reduce((s, b) => s + (b.totalPaid || 0), 0).toLocaleString()}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {grouped[yr].map(booking => (
-                            <BookingCard
-                                key={booking._id}
-                                booking={booking}
-                                isManager={isManager}
-                                onPress={() => navigation.navigate('MandalDetails', { mandalId: booking.mandalId?._id, bookingYear: booking.year })}
-                                onPressAddPayment={() => navigation.navigate('AddPayment', {
-                                    bookingId: booking._id,
-                                    mandalName: [booking.mandalId?.ganpatiTitle, booking.mandalId?.mandalName].filter(Boolean).join(' – '),
-                                    remainingAmount: booking.remainingAmount,
-                                })}
-                                onPressEdit={() => {
-                                    if (isManager) { toast.error('Only the owner can edit the price.'); return; }
-                                    setNewPrice(String(booking.finalPrice || ''));
-                                    setEditModal({
-                                        bookingId: booking._id,
-                                        currentPrice: booking.finalPrice,
-                                        isLocked: booking.isPriceLocked || (booking.remainingAmount || 0) <= 0,
-                                    });
-                                }}
-                                onPressDelete={() => {
-                                    if (isManager) { toast.error('Only the owner can delete bookings.'); return; }
-                                    handleDelete(booking._id, booking.mandalId?.ganpatiTitle || 'this mandal');
-                                }}
-                                isPriceLocked={booking.isPriceLocked || (booking.remainingAmount || 0) <= 0}
-                            />
-                        ))}
-                    </View>
+                renderItem={({ item: booking }) => (
+                    <BookingCard
+                        booking={booking}
+                        isManager={isManager}
+                        onPress={() => navigation.navigate('MandalDetails', { mandalId: booking.mandalId?._id, bookingYear: booking.year })}
+                        onPressAddPayment={() => navigation.navigate('AddPayment', {
+                            bookingId: booking._id,
+                            mandalName: [booking.mandalId?.ganpatiTitle, booking.mandalId?.mandalName].filter(Boolean).join(' – '),
+                            remainingAmount: booking.remainingAmount,
+                        })}
+                        onPressEdit={() => {
+                            if (isManager) { toast.error('Only the owner can edit the price.'); return; }
+                            setNewPrice(String(booking.finalPrice || ''));
+                            setEditModal({
+                                bookingId: booking._id,
+                                currentPrice: booking.finalPrice,
+                                isLocked: booking.isPriceLocked || (booking.remainingAmount || 0) <= 0,
+                            });
+                        }}
+                        onPressDelete={() => {
+                            if (isManager) { toast.error('Only the owner can delete bookings.'); return; }
+                            handleDelete(booking._id, booking.mandalId?.ganpatiTitle || 'this mandal');
+                        }}
+                        isPriceLocked={booking.isPriceLocked || (booking.remainingAmount || 0) <= 0}
+                    />
                 )}
                 ListFooterComponent={bookings.length > 0 ? (
                     <Text style={styles.footerNote}>End of booking history</Text>
                 ) : null}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={10}
             />
 
             {/* Edit Price Modal */}
@@ -370,6 +455,42 @@ const styles = StyleSheet.create({
     yearRight: { alignItems: 'flex-end' },
     yearTotalLabel: { fontSize: 9, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1 },
     yearTotalValue: { fontSize: Font.sm, fontWeight: '800', color: Colors.primary },
+
+    controlsRow: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: Spacing.lg, height: 48,
+    },
+    yearSelectorWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    controlLabel: { fontSize: 10, fontWeight: '800', color: Colors.textMuted, marginRight: Spacing.md, letterSpacing: 1 },
+    yearSelectorList: { paddingRight: Spacing.md },
+    yearChip: {
+        paddingHorizontal: 16, paddingVertical: 6,
+        borderRadius: Radius.full, backgroundColor: Colors.surface,
+        borderWidth: 1, borderColor: Colors.cardBorder, marginRight: 8,
+    },
+    yearChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    yearChipText: { fontSize: Font.sm, fontWeight: '700', color: Colors.textSecondary },
+    yearChipTextActive: { color: Colors.white },
+
+    searchWrapper: { alignItems: 'flex-end', justifyContent: 'center' },
+    searchIconButton: {
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    expandedSearch: {
+        flex: 1, flexDirection: 'row', alignItems: 'center',
+        backgroundColor: Colors.surface, borderRadius: Radius.full,
+        paddingHorizontal: Spacing.md, borderWidth: 1.5, borderColor: Colors.primary,
+        ...Shadow.md, width: '100%', height: 46,
+    },
+    inputIcon: { marginRight: Spacing.sm },
+    expandableInput: { flex: 1, fontSize: Font.md, color: Colors.textPrimary, fontWeight: '600' },
+    closeSearchBtn: { padding: 4 },
+
+    listHeaderRow: { marginBottom: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    listHeaderText: { fontSize: Font.sm, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    clearFilterText: { fontSize: Font.xs, color: Colors.primary, fontWeight: '700' },
 
     card: {
         backgroundColor: Colors.card, borderRadius: Radius.lg,

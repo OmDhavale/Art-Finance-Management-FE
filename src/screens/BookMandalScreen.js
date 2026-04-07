@@ -284,11 +284,18 @@ export default function BookMandalScreen({ navigation }) {
 
                     {/* Year chip picker */}
                     {(() => {
-                        const years = Array.from({ length: 6 }, (_, i) => currentYear + i);
                         const bookingSummary = selectedMandal?.bookingSummary || [];
                         const bookedYearsMap = Array.isArray(bookingSummary)
                             ? bookingSummary.reduce((acc, b) => ({ ...acc, [b.year]: b }), {})
                             : {};
+
+                        const bookedYearsList = Array.isArray(bookingSummary) ? bookingSummary.map(b => b.year) : [];
+                        const maxBooked = bookedYearsList.length > 0 ? Math.max(...bookedYearsList) : currentYear;
+                        const yearsToDisplay = Math.max(10, maxBooked - currentYear + 5); 
+                        const allPotentialYears = Array.from({ length: yearsToDisplay }, (_, i) => currentYear + i);
+                        
+                        // ONLY show years that are NOT already booked
+                        const years = allPotentialYears.filter(yr => !bookedYearsMap[yr]);
 
                         const isYearBooked = bookedYearsMap[booking.year];
 
@@ -303,36 +310,32 @@ export default function BookMandalScreen({ navigation }) {
                                         </Text>
                                     )}
                                 </View>
-                                <View style={styles.yearRow}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.yearScrollContent}
+                                    style={styles.yearSelectorScroll}
+                                >
                                     {years.map(yr => {
                                         const isSelected = booking.year === String(yr);
-                                        const isBooked = !!bookedYearsMap[yr];
                                         return (
                                             <TouchableOpacity
                                                 key={yr}
                                                 style={[
                                                     styles.yearChip,
                                                     isSelected && styles.yearChipSelected,
-                                                    isBooked && !isSelected && styles.yearChipBooked,
-                                                    isSelected && isBooked && styles.yearChipSelectedBooked,
                                                 ]}
                                                 onPress={() => setBooking(b => ({ ...b, year: String(yr) }))}
+                                                activeOpacity={0.7}
                                             >
                                                 <Text style={[
                                                     styles.yearChipText,
                                                     isSelected && styles.yearChipTextSelected,
-                                                    isBooked && !isSelected && styles.yearChipTextBooked,
                                                 ]}>{yr}</Text>
-                                                {isBooked && (
-                                                    <Text style={[
-                                                        styles.yearChipNote,
-                                                        isSelected && { color: Colors.white, opacity: 0.8 },
-                                                    ]}>booked</Text>
-                                                )}
                                             </TouchableOpacity>
                                         );
                                     })}
-                                </View>
+                                </ScrollView>
                             </View>
                         );
                     })()}
@@ -572,6 +575,7 @@ export default function BookMandalScreen({ navigation }) {
 
 function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan, navigation }) {
     const isFree = plan !== 'PRO';
+    const [showAllHistory, setShowAllHistory] = useState(false);
     const scale = useRef(new Animated.Value(1)).current;
     const onIn = () => Animated.spring(scale, { toValue: 0.985, useNativeDriver: true, speed: 40 }).start();
     const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
@@ -648,49 +652,61 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan,
             {expanded && mandal.bookingSummary?.length > 0 && (
                 <View style={styles.breakdown}>
                     <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
-                    {mandal.bookingSummary.map((b, i) => {
-                        const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
-                        const rawR = b.remainingAmount;
-                        const dispR = Math.max(0, rawR);
-                        const extra = rawR < 0 ? Math.abs(rawR) : 0;
-                        return (
-                            <View key={i} style={styles.breakdownRow}>
-                                <View style={styles.breakdownLeft}>
-                                    <Text style={styles.breakdownYear}>{b.year}</Text>
-                                    <Text style={styles.breakdownVendor}>
-                                        {isFree ? '🔒 Hidden (PRO feature)' : b.vendorName}
-                                    </Text>
-                                    {!isFree && b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
-                                </View>
-                                <View style={styles.breakdownRight}>
-                                    {isFree ? (
-                                        <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')} style={styles.lockHint}>
-                                            <Feather name="lock" size={12} color={Colors.primary} />
-                                            <Text style={styles.lockHintText}>Unlock History</Text>
-                                        </TouchableOpacity>
-                                    ) : (
-                                        <>
-                                            <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                                <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
-                                            </View>
-                                            <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                                {(() => {
-                                                    const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
-                                                    return `${pct}%`;
-                                                })()}
-                                            </Text>
-                                            <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
-                                            {extra > 0 && (
-                                                <Text style={styles.breakdownExtra}>
-                                                    +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                    {mandal.bookingSummary
+                        .slice(0, showAllHistory ? undefined : 3)
+                        .map((b, i) => {
+                            const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
+                            const rawR = b.remainingAmount;
+                            const dispR = Math.max(0, rawR);
+                            const extra = rawR < 0 ? Math.abs(rawR) : 0;
+                            return (
+                                <View key={i} style={styles.breakdownRow}>
+                                    <View style={styles.breakdownLeft}>
+                                        <Text style={styles.breakdownYear}>{b.year}</Text>
+                                        <Text style={styles.breakdownVendor}>
+                                            {isFree ? '🔒 Hidden (PRO feature)' : b.vendorName}
+                                        </Text>
+                                        {!isFree && b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
+                                    </View>
+                                    <View style={styles.breakdownRight}>
+                                        {isFree ? (
+                                            <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')} style={styles.lockHint}>
+                                                <Feather name="lock" size={12} color={Colors.primary} />
+                                                <Text style={styles.lockHintText}>Unlock History</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <>
+                                                <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                    <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                                </View>
+                                                <Text style={[styles.breakdownAmt, { color: gc.color }]}>
+                                                    {(() => {
+                                                        const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
+                                                        return `${pct}%`;
+                                                    })()}
                                                 </Text>
-                                            )}
-                                        </>
-                                    )}
+                                                <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                                {extra > 0 && (
+                                                    <Text style={styles.breakdownExtra}>
+                                                        +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                                    </Text>
+                                                )}
+                                            </>
+                                        )}
+                                    </View>
                                 </View>
-                            </View>
-                        );
-                    })}
+                            );
+                        })}
+                    {mandal.bookingSummary.length > 3 && (
+                        <TouchableOpacity 
+                            style={styles.viewMoreHistory} 
+                            onPress={() => setShowAllHistory(!showAllHistory)}
+                        >
+                            <Text style={styles.viewMoreText}>
+                                {showAllHistory ? 'Show Recent Only' : `View All ${mandal.bookingSummary.length} Records →`}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             )}
 
@@ -949,22 +965,30 @@ const styles = StyleSheet.create({
         fontSize: 10, fontWeight: '700', color: Colors.danger,
         backgroundColor: Colors.dangerBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
     },
-    yearRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    yearRow: { flexDirection: 'row' },
+    yearSelectorScroll: { marginHorizontal: -Spacing.xl, paddingHorizontal: Spacing.xl },
+    yearScrollContent: { paddingRight: Spacing.xl + Spacing.lg, gap: 10, paddingVertical: 4 },
     yearChip: {
-        flex: 1, minWidth: '10%',
-        paddingVertical: 1, borderRadius: Radius.md,
+        width: 72, height: 48, borderRadius: Radius.md,
         backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.inputBorder,
         alignItems: 'center', justifyContent: 'center',
     },
-    yearChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    yearChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary, ...Shadow.sm },
     yearChipSelectedBooked: { backgroundColor: Colors.danger, borderColor: Colors.danger },
     yearChipBooked: { backgroundColor: Colors.bg, borderColor: Colors.separator, opacity: 0.6 },
-    yearChipText: { fontSize: Font.md, fontWeight: '700', color: Colors.textSecondary },
+    yearChipText: { fontSize: Font.md, fontWeight: '800', color: Colors.textSecondary },
     yearChipTextSelected: { color: Colors.white },
     yearChipTextBooked: { color: Colors.textMuted },
-    yearChipNote: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', marginTop: 2, color: Colors.textMuted },
+    yearChipNote: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', marginTop: 1, color: Colors.textMuted },
 
     bookBtnNext: { backgroundColor: Colors.textSecondary, marginTop: -Spacing.xs },
     lockHint: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#BAE6FD' },
     lockHintText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+
+    viewMoreHistory: {
+        paddingVertical: 12, alignItems: 'center', marginTop: 4,
+    },
+    viewMoreText: {
+        fontSize: Font.xs, fontWeight: '800', color: Colors.primary, letterSpacing: 0.5,
+    },
 });

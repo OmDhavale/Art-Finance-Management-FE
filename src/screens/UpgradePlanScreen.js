@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-    ScrollView, StatusBar, ActivityIndicator, Alert
+    ScrollView, StatusBar, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
 import api from '../api/api';
 import storage from '../utils/storage';
@@ -51,14 +52,7 @@ export default function UpgradePlanScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.safe}>
-            <StatusBar barStyle="dark-content" />
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Plans & Billing</Text>
-                <View style={{ width: 40 }} />
-            </View>
+            <ScreenHeader title="Plans & Billing" onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={styles.scroll}>
                 <View style={styles.heroSection}>
@@ -79,7 +73,10 @@ export default function UpgradePlanScreen({ navigation }) {
                     <View style={styles.planHeader}>
                         <View>
                             <Text style={styles.planName}>PRO PLAN</Text>
-                            <Text style={styles.planPrice}>₹999<Text style={styles.planPeriod}>/year</Text></Text>
+                            <View style={styles.priceContainer}>
+                                <Text style={styles.planPrice}>₹999<Text style={styles.planPeriod}>/year</Text></Text>
+                                <Text style={styles.oldPrice}>₹1,499</Text>
+                            </View>
                         </View>
                         <View style={styles.proBadge}>
                             <Text style={styles.proBadgeText}>BEST VALUE</Text>
@@ -162,13 +159,6 @@ export default function UpgradePlanScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.bg },
-    header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: Spacing.md, paddingVertical: 12, backgroundColor: Colors.card,
-        borderBottomWidth: 1, borderBottomColor: Colors.separator,
-    },
-    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
     scroll: { padding: Spacing.lg },
     heroSection: { alignItems: 'center', marginBottom: Spacing.xl, marginTop: Spacing.md },
     iconCircle: {
@@ -186,8 +176,13 @@ const styles = StyleSheet.create({
     activePlan: { backgroundColor: '#F8FAFC' },
     planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     planName: { fontSize: 12, fontWeight: '800', color: Colors.textMuted, letterSpacing: 1.5 },
-    planPrice: { fontSize: 32, fontWeight: '900', color: Colors.textPrimary, marginTop: 4 },
+    planPrice: { fontSize: 32, fontWeight: '900', color: Colors.textPrimary },
     planPeriod: { fontSize: 14, fontWeight: '600', color: Colors.textMuted },
+    priceContainer: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 4 },
+    oldPrice: { 
+        fontSize: 16, fontWeight: '700', color: Colors.danger, 
+        textDecorationLine: 'line-through', opacity: 0.8 
+    },
     proBadge: { backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
     proBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.white },
     proBadgeSmall: { backgroundColor: '#F9731615', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 },
