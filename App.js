@@ -9,6 +9,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import { Colors } from './src/theme';
 import { ToastProvider } from './src/utils/ToastProvider';
+import { LanguageProvider } from './src/context/LanguageContext';
 
 function RootNavigator() {
   const { token, loading } = useAuth();
@@ -47,14 +48,16 @@ function RootNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
-            <RootNavigator />
-          </NavigationContainer>
-        </AuthProvider>
-      </ToastProvider>
+      <LanguageProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <NavigationContainer>
+              <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+              <RootNavigator />
+            </NavigationContainer>
+          </AuthProvider>
+        </ToastProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

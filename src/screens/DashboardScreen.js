@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
 import api from '../api/api';
 import { toast } from '../utils/toast';
@@ -109,6 +110,8 @@ export default function DashboardScreen({ navigation }) {
     // Drawer state and animations
     const [drawerVisible, setDrawerVisible] = useState(false);
     const [themeExpanded, setThemeExpanded] = useState(false);
+    const [langExpanded, setLangExpanded] = useState(false);
+    const { t, currentLanguage, changeLanguage } = useLanguage();
     const { width } = Dimensions.get('window');
     const slideAnim = useRef(new Animated.Value(-width * 0.8)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -237,23 +240,23 @@ export default function DashboardScreen({ navigation }) {
                                     {user?.workshopName || 'My Workshop'}
                                 </Text>
                                 <Text style={drawerStyles.userName} numberOfLines={1}>
-                                    Murtikar: {user?.name || 'Artist'}
+                                    {t('greeting_artist')}: {user?.name || 'Artist'}
                                 </Text>
                                 <View style={drawerStyles.roleBadge}>
-                                    <Text style={drawerStyles.roleText}>{user?.role?.toUpperCase() || 'OWNER'}</Text>
+                                    <Text style={drawerStyles.roleText}>{user?.role?.toUpperCase() === 'OWNER' ? t('owner') : t('artist')}</Text>
                                 </View>
                             </View>
                         </View>
-
+ 
                         <View style={drawerStyles.divider} />
-
+ 
                         {/* Drawer Items */}
                         <ScrollView contentContainerStyle={drawerStyles.menuList} showsVerticalScrollIndicator={false}>
                             {/* 1. Account Center */}
                             <DrawerItem
                                 icon="user"
-                                title="Account Center"
-                                subtitle="Workshop profile & team management"
+                                title={t('account_center')}
+                                subtitle={t('workshop_profile')}
                                 onPress={() => {
                                     closeDrawer(() => {
                                         navigation.navigate('WorkshopDetails');
@@ -261,7 +264,48 @@ export default function DashboardScreen({ navigation }) {
                                 }}
                             />
 
-                            {/* 2. App Appearance (Theme Switcher) */}
+                            {/* 2. App Language */}
+                            <TouchableOpacity
+                                style={drawerStyles.menuItem}
+                                onPress={() => setLangExpanded(!langExpanded)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[drawerStyles.iconWrap, { backgroundColor: Colors.primaryMuted }]}>
+                                    <Feather name="globe" size={18} color={Colors.primary} />
+                                </View>
+                                <View style={drawerStyles.textWrap}>
+                                    <Text style={drawerStyles.itemTitle}>{t('language')}</Text>
+                                    <Text style={drawerStyles.itemSubtitle}>
+                                        {currentLanguage === 'en' ? 'English' : currentLanguage === 'hi' ? 'हिन्दी' : 'मराठी'}
+                                    </Text>
+                                </View>
+                                <Feather name={langExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textMuted} />
+                            </TouchableOpacity>
+
+                            {langExpanded && (
+                                <View style={drawerStyles.themeSubmenu}>
+                                    <ThemeOption
+                                        label="English"
+                                        color={Colors.primary}
+                                        selected={currentLanguage === 'en'}
+                                        onPress={() => changeLanguage('en')}
+                                    />
+                                    <ThemeOption
+                                        label="हिन्दी"
+                                        color={Colors.primary}
+                                        selected={currentLanguage === 'hi'}
+                                        onPress={() => changeLanguage('hi')}
+                                    />
+                                    <ThemeOption
+                                        label="मराठी"
+                                        color={Colors.primary}
+                                        selected={currentLanguage === 'mr'}
+                                        onPress={() => changeLanguage('mr')}
+                                    />
+                                </View>
+                            )}
+ 
+                            {/* 3. App Appearance (Theme Switcher) */}
                             <TouchableOpacity
                                 style={drawerStyles.menuItem}
                                 onPress={() => setThemeExpanded(!themeExpanded)}
@@ -271,30 +315,30 @@ export default function DashboardScreen({ navigation }) {
                                     <Feather name="aperture" size={18} color={Colors.primary} />
                                 </View>
                                 <View style={drawerStyles.textWrap}>
-                                    <Text style={drawerStyles.itemTitle}>App Appearance</Text>
+                                    <Text style={drawerStyles.itemTitle}>{t('app_appearance')}</Text>
                                     <Text style={drawerStyles.itemSubtitle}>
-                                        {currentTheme === 'light_orange' ? 'Warm Orange' : currentTheme === 'light_teal' ? 'Creative Teal' : 'Charcoal Dark'}
+                                        {currentTheme === 'light_orange' ? t('theme_warm_orange') : currentTheme === 'light_teal' ? t('theme_creative_teal') : t('theme_charcoal_dark')}
                                     </Text>
                                 </View>
                                 <Feather name={themeExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textMuted} />
                             </TouchableOpacity>
-
+ 
                             {themeExpanded && (
                                 <View style={drawerStyles.themeSubmenu}>
                                     <ThemeOption
-                                        label="Warm Orange (Default)"
+                                        label={t('theme_warm_orange')}
                                         color="#F97316"
                                         selected={currentTheme === 'light_orange'}
                                         onPress={() => handleThemeChange('light_orange')}
                                     />
                                     <ThemeOption
-                                        label="Creative Teal"
+                                        label={t('theme_creative_teal')}
                                         color="#0D9488"
                                         selected={currentTheme === 'light_teal'}
                                         onPress={() => handleThemeChange('light_teal')}
                                     />
                                     <ThemeOption
-                                        label="Charcoal Dark"
+                                        label={t('theme_charcoal_dark')}
                                         color="#1E293B"
                                         selected={currentTheme === 'dark_charcoal'}
                                         onPress={() => handleThemeChange('dark_charcoal')}
@@ -302,38 +346,38 @@ export default function DashboardScreen({ navigation }) {
                                     />
                                 </View>
                             )}
-
-                            {/* 3. App User Guide */}
+ 
+                            {/* 4. App User Guide */}
                             <DrawerItem
                                 icon="book-open"
-                                title="App User Guide"
-                                subtitle="How to use the application"
+                                title={t('app_user_guide')}
+                                subtitle={t('how_to_use')}
                                 onPress={() => {
                                     closeDrawer(() => {
                                         navigation.navigate('Onboarding');
                                     });
                                 }}
                             />
-
-                            {/* 4. Contact Developer Support */}
+ 
+                            {/* 5. Contact Developer Support */}
                             <DrawerItem
                                 icon="whatsapp"
-                                title="Developer Support"
-                                subtitle="WhatsApp us for any issues/bugs"
+                                title={t('dev_support')}
+                                subtitle={t('whatsapp_support')}
                                 iconType="fa"
                                 iconColor="#16A34A"
                                 onPress={() => {
                                     Linking.openURL('https://wa.me/9892783192');
                                 }}
                             />
-
+ 
                             <View style={drawerStyles.menuDivider} />
-
-                            {/* 5. Sign Out */}
+ 
+                            {/* 6. Sign Out */}
                             <DrawerItem
                                 icon="log-out"
-                                title="Sign Out"
-                                subtitle="Exit current session"
+                                title={t('sign_out')}
+                                subtitle={t('exit_session')}
                                 iconColor={Colors.danger}
                                 hideChevron
                                 onPress={() => {
@@ -343,11 +387,11 @@ export default function DashboardScreen({ navigation }) {
                                 }}
                             />
                         </ScrollView>
-
+ 
                         {/* Footer */}
                         <View style={drawerStyles.footer}>
-                            <Text style={drawerStyles.versionText}>Version 1.0.4</Text>
-                            <Text style={drawerStyles.proudlyIndia}>Proudly Made in India 🇮🇳</Text>
+                            <Text style={drawerStyles.versionText}>{t('version')} 1.0.4</Text>
+                            <Text style={drawerStyles.proudlyIndia}>{t('made_in_india')}</Text>
                         </View>
                     </Animated.View>
                 </View>
@@ -382,43 +426,43 @@ export default function DashboardScreen({ navigation }) {
             >
                 {/* Greeting */}
                 <Animated.View style={[styles.greeting, { opacity: headerFade }]}>
-                    <Text style={styles.greetText}>Namaste, {user?.name?.split(' ')[0] || 'Murtikar'}!</Text>
-                    <Text style={styles.greetSub}>Your workshop summary for this season</Text>
+                    <Text style={styles.greetText}>{t('hello_artist')}, {user?.name?.split(' ')[0] || t('greeting_artist')}!</Text>
+                    <Text style={styles.greetSub}>{t('workshop_summary')}</Text>
                 </Animated.View>
-
+ 
                 {loading && !refreshing ? (
                     <View style={styles.loaderWrap}>
                         <ActivityIndicator color={Colors.primary} size="large" />
                     </View>
                 ) : (
                     <Animated.View style={{ opacity: contentFade }}>
-
+ 
                         {/* Financial Status */}
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionLabel}>FINANCIAL STATUS</Text>
+                            <Text style={styles.sectionLabel}>{t('financial_status')}</Text>
                         </View>
                         <View style={styles.statRow}>
                             <StatCard
-                                label="Active Mandals"
+                                label={t('active_mandals')}
                                 value={stats?.activeMandals ?? '—'}
                                 iconName="users"
                                 footer="Current year"
                             />
                             <View style={styles.gap} />
                             <StatCard
-                                label="Pending"
+                                label={t('pending')}
                                 value={stats?.totalPending ? `₹${stats.totalPending.toLocaleString()}` : (stats?.totalPending === 0 ? '₹0' : '—')}
                                 iconName="clock"
                                 tinted
                                 footer={stats?.dueMandals > 0 ? `${stats.dueMandals} due mandals` : 'No dues'}
                             />
                         </View>
-
-
-
+ 
+ 
+ 
                         {/* Quick Actions */}
-                        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>QUICK ACTIONS</Text>
-
+                        <Text style={[styles.sectionLabel, { marginTop: Spacing.xl, marginBottom: Spacing.md }]}>{t('quick_actions')}</Text>
+ 
                         {/* Main Row — Prioritized actions */}
                         <View style={styles.quickGrid}>
                             <TouchableOpacity
@@ -429,9 +473,9 @@ export default function DashboardScreen({ navigation }) {
                                 <View style={styles.iconCircleWhite}>
                                     <Feather name="plus" size={24} color={Colors.primary} />
                                 </View>
-                                <Text style={styles.mainTileLabelWhite}>Book New{'\n'}Mandal</Text>
+                                <Text style={styles.mainTileLabelWhite}>{t('book_new_mandal')}</Text>
                             </TouchableOpacity>
-
+ 
                             <TouchableOpacity
                                 style={styles.mainTileSecondary}
                                 onPress={() => navigation.navigate('MyBookings')}
@@ -440,10 +484,10 @@ export default function DashboardScreen({ navigation }) {
                                 <View style={styles.iconCircleBlue}>
                                     <Feather name="book-open" size={24} color="#0284C7" />
                                 </View>
-                                <Text style={styles.mainTileLabelBlue}>My All{'\n'}Bookings</Text>
+                                <Text style={styles.mainTileLabelBlue}>{t('my_all_bookings')}</Text>
                             </TouchableOpacity>
                         </View>
-
+ 
                         <TouchableOpacity
                             style={styles.secondaryActionRow}
                             onPress={() => navigation.navigate('RegisterMandal')}
@@ -453,26 +497,26 @@ export default function DashboardScreen({ navigation }) {
                                 <Feather name="edit-3" size={18} color={Colors.primary} />
                             </View>
                             <View style={styles.secondaryTextWrap}>
-                                <Text style={styles.secondaryActionTitle}>Register New Mandal</Text>
-                                <Text style={styles.secondaryActionSub}>Add a new mandal to the system</Text>
+                                <Text style={styles.secondaryActionTitle}>{t('register_new_mandal')}</Text>
+                                <Text style={styles.secondaryActionSub}>{t('register_new_mandal_sub')}</Text>
                             </View>
                             <Feather name="chevron-right" size={18} color={Colors.textMuted} />
                         </TouchableOpacity>
                         {/* Recent Activity */}
                         <View style={[styles.sectionHeader, { marginTop: Spacing.xl }]}>
-                            <Text style={styles.sectionLabel}>RECENT ACTIVITY</Text>
+                            <Text style={styles.sectionLabel}>{t('recent_activity')}</Text>
                             <View style={styles.timeFilter}>
-                                <Text style={styles.timeFilterText}>Last 10 entries</Text>
+                                <Text style={styles.timeFilterText}>{t('last_10_entries')}</Text>
                             </View>
                         </View>
-
+ 
                         {stats?.recentActivity?.length > 0 ? (
                             stats.recentActivity.map(act => (
                                 <ActivityItem key={act._id + act.type} activity={act} />
                             ))
                         ) : (
                             <View style={styles.emptyCard}>
-                                <Text style={styles.emptyText}>No recent activity mixed with current year data.</Text>
+                                <Text style={styles.emptyText}>{t('no_recent_activity')}</Text>
                             </View>
                         )}
 
