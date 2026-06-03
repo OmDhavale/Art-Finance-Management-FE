@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView,
     KeyboardAvoidingView, Platform, StatusBar,
@@ -11,12 +11,63 @@ import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
 import { toast } from '../utils/toast';
+import { getSimilarity } from '../utils/phoneticMatcher';
 
 export default function RegisterMandalScreen({ navigation }) {
     const [form, setForm] = useState({ ganpatiTitle: '', mandalName: '', area: '', city: '' });
     const [loading, setLoading] = useState(false);
+    const [existingMandals, setExistingMandals] = useState([]);
+    const [warnings, setWarnings] = useState([]);
 
     const set = (key) => (val) => setForm(f => ({ ...f, [key]: val }));
+
+    useEffect(() => {
+        api.get('/mandals')
+            .then(res => {
+                setExistingMandals(res.data.data || []);
+            })
+            .catch(err => {
+                console.log('Failed to fetch mandals for duplicate checking:', err);
+            });
+    }, []);
+
+    useEffect(() => {
+        const mName = form.mandalName.trim();
+        const gTitle = form.ganpatiTitle.trim();
+        if (!mName && !gTitle) {
+            setWarnings([]);
+            return;
+        }
+
+        const found = [];
+        for (const item of existingMandals) {
+            let isMatch = false;
+            let matchReason = '';
+
+            if (mName && item.mandalName) {
+                const sim = getSimilarity(mName, item.mandalName);
+                if (sim >= 0.8) {
+                    isMatch = true;
+                    matchReason = `Similar Mandal Name (${Math.round(sim * 100)}% match)`;
+                }
+            }
+            if (gTitle && item.ganpatiTitle) {
+                const sim = getSimilarity(gTitle, item.ganpatiTitle);
+                if (sim >= 0.8) {
+                    isMatch = true;
+                    matchReason = `Similar Ganpati Title (${Math.round(sim * 100)}% match)`;
+                }
+            }
+
+            if (isMatch) {
+                found.push({
+                    ...item,
+                    matchReason
+                });
+            }
+        }
+        setWarnings(found);
+    }, [form.mandalName, form.ganpatiTitle, existingMandals]);
 
     const handleSubmit = async () => {
         if (!form.ganpatiTitle.trim() || !form.mandalName.trim() || !form.area.trim() || !form.city.trim()) {
@@ -94,6 +145,27 @@ export default function RegisterMandalScreen({ navigation }) {
                         </View>
                     </View>
 
+                    {/* Duplicate Warnings Banner */}
+                    {warnings.length > 0 && (
+                        <View style={styles.warningContainer}>
+                            <View style={styles.warningHeader}>
+                                <Feather name="alert-triangle" size={16} color="#C2410C" />
+                                <Text style={styles.warningTitle}>Potential Duplicate Detected</Text>
+                            </View>
+                            <Text style={styles.warningText}>
+                                A similar mandal is already registered in your records. Please verify before proceeding:
+                            </Text>
+                            {warnings.slice(0, 3).map((w, idx) => (
+                                <View key={w._id || idx} style={styles.warningItem}>
+                                    <Text style={styles.warnName}>• {w.ganpatiTitle} ({w.mandalName})</Text>
+                                    <Text style={styles.warnLoc}>
+                                        Locality: {w.area || '—'}, {w.city || '—'} • {w.matchReason}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
                     <PrimaryButton
                         title="Register Mandal"
                         iconName="plus"
@@ -131,4 +203,51 @@ const styles = StyleSheet.create({
     halfWidth: { flex: 1 },
 
     btn: { marginTop: Spacing.lg },
+
+    warningContainer: {
+        backgroundColor: '#FFF7ED',
+        borderWidth: 1,
+        borderColor: '#FED7AA',
+        borderRadius: Radius.md,
+        padding: Spacing.md,
+        marginTop: Spacing.md,
+        ...Shadow.sm,
+    },
+    warningHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 6,
+    },
+    warningTitle: {
+        fontSize: Font.sm,
+        fontWeight: '800',
+        color: '#C2410C',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    warningText: {
+        fontSize: Font.xs,
+        color: '#7C2D12',
+        lineHeight: 16,
+        marginBottom: 8,
+    },
+    warningItem: {
+        backgroundColor: Colors.white,
+        borderRadius: Radius.sm,
+        padding: 8,
+        marginTop: 4,
+        borderWidth: 1,
+        borderColor: '#FDBA74',
+    },
+    warnName: {
+        fontSize: Font.xs + 1,
+        fontWeight: '700',
+        color: Colors.textPrimary,
+    },
+    warnLoc: {
+        fontSize: 10,
+        color: Colors.textMuted,
+        marginTop: 2,
+    },
 });
