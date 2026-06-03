@@ -1,26 +1,72 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    ActivityIndicator, Animated, StatusBar,
+    ActivityIndicator, Animated, StatusBar, ScrollView, RefreshControl,
+    Alert, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import api from '../api/api';
 import ScreenHeader from '../components/ScreenHeader';
-import { Colors, Font, Radius, Spacing, getGradeConfig, getOverallGradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, Shadow, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 import { useAuth } from '../context/AuthContext';
 
+// Stat box used in Booking Summary grid
+function StatBox({ iconName, label, value, valueColor }) {
+    return (
+        <View style={styles.statBox}>
+            <View style={styles.statIconRow}>
+                <Feather name={iconName} size={13} color={Colors.textMuted} />
+                <Text style={styles.statLabel}>{label}</Text>
+            </View>
+            <Text style={[styles.statValue, valueColor && { color: valueColor }]}>{value}</Text>
+        </View>
+    );
+}
+
+// Health bar component
+function PaymentHealthBar({ remaining, finalPrice }) {
+    const pct = finalPrice > 0 ? Math.max(0, Math.min(1, 1 - remaining / finalPrice)) : 0;
+    const health = pct >= 1 ? 'excellent' : pct >= 0.75 ? 'good' : pct >= 0.5 ? 'fair' : 'poor';
+    const labelColor = health === 'excellent' ? Colors.success : health === 'good' ? Colors.success : health === 'fair' ? Colors.warning : Colors.danger;
+    const barColor = health === 'excellent' ? Colors.success : health === 'good' ? Colors.success : health === 'fair' ? Colors.primary : Colors.danger;
+
+    return (
+        <View style={styles.healthCard}>
+            <View style={styles.healthHeaderRow}>
+                <Text style={styles.healthHeading}>PAYMENT HEALTH</Text>
+                <Text style={[styles.healthLabel, { color: labelColor }]}>{health}</Text>
+            </View>
+            <View style={styles.healthBarTrack}>
+                <View style={[styles.healthBarFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: barColor }]} />
+            </View>
+            <View style={styles.healthNoteRow}>
+                <Feather name="info" size={11} color={Colors.textMuted} />
+                <Text style={styles.healthNote}>Grade calculated based on advance received and remaining duration.</Text>
+            </View>
+        </View>
+    );
+}
+
 export default function MandalDetailsScreen({ route, navigation }) {
-    const { mandalId } = route.params;
+    const { mandalId, bookingYear } = route.params;
     const { user } = useAuth();
     const [mandal, setMandal] = useState(null);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => { fetchDetails(); }, []);
+    // Price Edit Modal State
+    const [priceModalVisible, setPriceModalVisible] = useState(false);
+    const [newPrice, setNewPrice] = useState('');
+    const [actionLoading, setActionLoading] = useState(false);
 
-    const fetchDetails = async () => {
-        setLoading(true);
+    useEffect(() => { fetchDetails(); }, [mandalId]);
+
+    const fetchDetails = async (isRefresh = false) => {
+        if (!isRefresh) setLoading(true);
+        else setRefreshing(true);
         try {
             const res = await api.get(`/mandals/${mandalId}`);
             setMandal(res.data.data.mandal);
@@ -30,7 +76,65 @@ export default function MandalDetailsScreen({ route, navigation }) {
             toast.error('Failed to load mandal details.');
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const handleEditPrice = () => {
+        if (!myLatestBooking) return;
+        setNewPrice(String(myLatestBooking.finalPrice));
+        setPriceModalVisible(true);
+    };
+
+    const submitPriceUpdate = async () => {
+        const price = parseFloat(newPrice);
+        if (isNaN(price) || price < 0) {
+            return toast.error("Please enter a valid amount.");
+        }
+
+        setActionLoading(true);
+        try {
+            await api.patch(`/bookings/${myLatestBooking._id}/price`, {
+                finalPrice: price,
+                reason: "Negotiation"
+            });
+            toast.success("Agreed price updated successfully.");
+            setPriceModalVisible(false);
+            fetchDetails(true);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to update price.");
+        } finally {
+            setActionLoading(true); // Small delay feel
+            setTimeout(() => setActionLoading(false), 500);
+        }
+    };
+
+    const handleCloseBooking = () => {
+        if (!myLatestBooking) return;
+
+        Alert.alert(
+            "Close Booking?",
+            "Closing this booking will finalize the current status. You can still view it in history.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Confirm Close",
+                    style: "destructive",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await api.patch(`/bookings/${myLatestBooking._id}/close`);
+                            toast.success("Booking closed successfully.");
+                            fetchDetails(true);
+                        } catch (err) {
+                            toast.error(err.response?.data?.message || "Failed to close booking.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (loading) {
@@ -38,173 +142,334 @@ export default function MandalDetailsScreen({ route, navigation }) {
             <View style={styles.flex}>
                 <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
                 <ScreenHeader title="Mandal Details" onBack={() => navigation.goBack()} />
-                <View style={styles.center}><ActivityIndicator color={Colors.accent} size="large" /></View>
+                <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
             </View>
         );
     }
 
-    const renderBooking = ({ item }) => {
-        const cfg = getGradeConfig(item.remainingAmount || 0);
-        const rawR = item.remainingAmount || 0;
-        const dispR = Math.max(0, rawR);
-        const extra = rawR < 0 ? Math.abs(rawR) : 0;
+    // Find the specified year's booking (or fallback to latest) that belongs to me
+    const isMyBooking = (item) =>
+        item.vendorId?._id === user?._id ||
+        (user?.role === 'manager' && item.vendorId?._id === user?.ownerId);
 
-        // Is this booking belonging to the current user's workshop/account?
-        const isMyBooking = item.vendorId?._id === user?._id ||
-            (user?.role === 'manager' && item.vendorId?._id === user?.ownerId);
-
-        return (
-            <View style={styles.bookingCard}>
-                <View style={styles.bookingHeader}>
-                    <Text style={styles.bookingYear}>{item.year}</Text>
-                    <View style={[styles.gradePill, { backgroundColor: cfg.bg }]}>
-                        <Text style={[styles.gradeText, { color: cfg.color }]}>{cfg.label}</Text>
-                    </View>
-                </View>
-                <View style={styles.separator} />
-                <Row label="Vendor" value={`${item.vendorId?.name || 'N/A'} · ${item.vendorId?.workshopName || '—'}`} />
-                <Row label="Murti Size" value={item.murtiSize || '—'} />
-                {isMyBooking && (
-                    <>
-                        <Row label="Final Price" value={`₹${(item.finalPrice || 0).toLocaleString()}`} />
-                        <Row label="Total Paid" value={`₹${(item.totalPaid || 0).toLocaleString()}`} />
-                    </>
-                )}
-                <Row
-                    label={isMyBooking ? (extra > 0 ? 'Remaining' : 'Remaining') : 'Pending Amount'}
-                    value={extra > 0 ? `₹0 (paid in full)` : `₹${dispR.toLocaleString()}`}
-                    valueColor={cfg.color}
-                    bold
-                />
-                {isMyBooking && extra > 0 && (
-                    <Row label="Extra Paid" value={`+₹${extra.toLocaleString()}`} valueColor="#1B5E20" bold />
-                )}
-
-                {/* Payment Log — only visible for own bookings */}
-                {isMyBooking && item.payments && item.payments.length > 0 && (
-                    <>
-                        <View style={styles.separator} />
-                        <TouchableOpacity
-                            style={styles.logBtn}
-                            onPress={() => navigation.navigate('PaymentLogs', {
-                                bookingId: item._id,
-                                mandalName: mandal?.ganpatiTitle,
-                                year: item.year,
-                            })}
-                        >
-                            <View style={styles.logBtnLeft}>
-                                <Text style={styles.logBtnTitle}>Payment Log</Text>
-                                <Text style={styles.logBtnSub}>
-                                    {item.payments.length} {item.payments.length === 1 ? 'entry' : 'entries'} · ₹{(item.totalPaid || 0).toLocaleString()} received
-                                </Text>
-                            </View>
-                            <Text style={styles.logBtnArrow}>›</Text>
-                        </TouchableOpacity>
-                    </>
-                )}
-
-                {/* Price History — only for own bookings */}
-                {isMyBooking && item.priceHistory && item.priceHistory.length > 0 && (
-                    <>
-                        <View style={styles.separator} />
-                        <Text style={styles.priceHistoryTitle}>PRICE HISTORY</Text>
-                        {item.priceHistory.map((h, idx) => (
-                            <View key={idx} style={styles.priceHistoryRow}>
-                                <View style={styles.priceHistoryDot} />
-                                <View style={styles.priceHistoryContent}>
-                                    <Text style={styles.priceHistoryChange}>
-                                        ₹{(h.oldPrice || 0).toLocaleString()} → ₹{(h.newPrice || 0).toLocaleString()}
-                                    </Text>
-                                    {h.reason ? (
-                                        <Text style={styles.priceHistoryReason}>Reason: {h.reason}</Text>
-                                    ) : null}
-                                    {h.changedAt ? (
-                                        <Text style={styles.priceHistoryDate}>
-                                            {new Date(h.changedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                        </Text>
-                                    ) : null}
-                                </View>
-                            </View>
-                        ))}
-                    </>
-                )}
-
-                {isMyBooking && (
-                    <TouchableOpacity
-                        style={styles.addPayBtn}
-                        onPress={() => navigation.navigate('AddPayment', { bookingId: item._id })}
-                    >
-                        <Text style={styles.addPayText}>+ Add Payment</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-        );
-    };
+    const myLatestBooking = [...bookings]
+        .filter(isMyBooking)
+        .sort((a, b) => b.year - a.year)
+        .find(b => bookingYear ? b.year === bookingYear : true);
 
     return (
         <View style={styles.flex}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-            <ScreenHeader title="Mandal Details" onBack={() => navigation.goBack()} />
+            <ScreenHeader
+                title={mandal?.ganpatiTitle ? `${mandal.ganpatiTitle}${myLatestBooking?.year ? ` (${myLatestBooking.year})` : ''}` : 'Mandal Details'}
+                onBack={() => navigation.goBack()}
+            />
+
             <Animated.View style={[styles.flex, { opacity: fadeAnim }]}>
-                <FlatList
-                    style={styles.flex}
-                    ListHeaderComponent={
-                        <View>
-                            <View style={styles.mandalBanner}>
-                                <View style={styles.bannerMonogram}>
-                                    <Text style={styles.bannerMonoText}>
-                                        {(mandal?.ganpatiTitle || 'M').charAt(0).toUpperCase()}
-                                    </Text>
-                                </View>
-                                <Text style={styles.ganpatiTitle}>{mandal?.ganpatiTitle}</Text>
-                                <Text style={styles.mandalName}>{mandal?.mandalName}</Text>
+                <ScrollView
+                    contentContainerStyle={styles.container}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={() => fetchDetails(true)} colors={[Colors.primary]} />
+                    }
+                >
+
+                    {/* Hero section */}
+                    <View style={styles.heroSection}>
+                        <View style={styles.heroRow}>
+                            <View style={styles.heroText}>
+                                <Text style={styles.heroTitle}>{mandal?.ganpatiTitle}{myLatestBooking?.year ? ` (${myLatestBooking.year})` : ''}</Text>
                                 {(mandal?.area || mandal?.city) ? (
-                                    <Text style={styles.mandalLocation}>
-                                        {[mandal.area, mandal.city].filter(Boolean).join(', ')}
-                                    </Text>
+                                    <View style={styles.locationRow}>
+                                        <Feather name="map-pin" size={12} color={Colors.textMuted} />
+                                        <Text style={styles.locationText}>
+                                            {[mandal.area, mandal.city].filter(Boolean).join(', ')}
+                                        </Text>
+                                    </View>
                                 ) : null}
-                                {/* Overall grade badge */}
-                                {(() => {
-                                    const ogCfg = mandal?.overallGrade
-                                        ? getOverallGradeConfig(mandal.overallGrade)
-                                        : null;
-                                    return ogCfg ? (
-                                        <View style={styles.bannerGradeWrap}>
-                                            <View style={[styles.bannerGradeBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
-                                                <Text style={[styles.bannerGradeBadgeText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
+                                <View style={styles.tagsRow}>
+                                    {mandal?.mandalName ? (
+                                        <View style={styles.tag}>
+                                            <Feather name="users" size={10} color={Colors.primary} />
+                                            <Text style={styles.tagText}>{mandal.mandalName}</Text>
+                                        </View>
+                                    ) : null}
+                                    {myLatestBooking ? (
+                                        <View style={[styles.tag, styles.tagGreen]}>
+                                            <Text style={styles.tagGreenText}>Active Booking</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+                            </View>
+                            {/* Monogram circle
+                            <View style={styles.monogramCircle}>
+                                <Feather name="image" size={22} color={Colors.textMuted} />
+                            </View> */}
+                        </View>
+                    </View>
+
+                    {/* Booking Summary (latest own booking) */}
+                    {myLatestBooking ? (
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryHeader}>
+                                <Feather name="trending-down" size={15} color={Colors.primary} />
+                                <Text style={styles.summaryTitle}>Booking Summary</Text>
+                            </View>
+                            <View style={styles.statGrid}>
+                                <StatBox iconName="scissors" label="MURTI SIZE" value={myLatestBooking.murtiSize || '—'} />
+                                <View style={styles.statBox}>
+                                    <View style={styles.statIconRow}>
+                                        <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: '700' }}>₹</Text>
+                                        <Text style={styles.statLabel}>FINAL PRICE</Text>
+                                    </View>
+                                    <Text style={styles.statValue}>₹{(myLatestBooking.finalPrice || 0).toLocaleString()}</Text>
+                                </View>
+                                <View style={styles.statBox}>
+                                    <View style={styles.statIconRow}>
+                                        <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: '700' }}>₹</Text>
+                                        <Text style={styles.statLabel}>TOTAL PAID</Text>
+                                    </View>
+                                    <Text style={styles.statValue}>₹{(myLatestBooking.totalPaid || 0).toLocaleString()}</Text>
+                                </View>
+                                <StatBox
+                                    iconName="clock"
+                                    label="REMAINING"
+                                    value={`₹${Math.max(0, myLatestBooking.remainingAmount || 0).toLocaleString()}`}
+                                    valueColor={(myLatestBooking.remainingAmount || 0) > 0 ? Colors.danger : Colors.success}
+                                />
+                            </View>
+                        </View>
+                    ) : null}
+
+                    {/* Payment health bar */}
+                    {myLatestBooking && (myLatestBooking.finalPrice || 0) > 0 ? (
+                        <PaymentHealthBar
+                            remaining={Math.max(0, myLatestBooking.remainingAmount || 0)}
+                            finalPrice={myLatestBooking.finalPrice || 0}
+                        />
+                    ) : null}
+
+                    {/* Recent Payments */}
+                    {myLatestBooking?.payments?.length > 0 ? (
+                        <View>
+                            <View style={styles.recentHeader}>
+                                <Text style={styles.recentTitle}>Recent Payments</Text>
+                                <TouchableOpacity
+                                    style={styles.viewHistoryBtn}
+                                    onPress={() => navigation.navigate('PaymentLogs', {
+                                        bookingId: myLatestBooking._id,
+                                        mandalName: mandal?.ganpatiTitle,
+                                        year: myLatestBooking.year,
+                                    })}
+                                >
+                                    <Text style={styles.viewHistoryText}>View Complete History</Text>
+                                    <Feather name="chevron-right" size={14} color={Colors.primary} />
+                                </TouchableOpacity>
+                            </View>
+                            {[...myLatestBooking.payments].slice(0, 3).map((p, idx) => {
+                                const date = new Date(p.paymentDate || p.createdAt);
+                                const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                                const modeLabel = p.paymentMode === 'upi' ? 'UPI Transfer' : p.paymentMode === 'cheque' ? 'Bank Transfer' : 'Cash Payment';
+                                const isVerified = !p.isAdvance;
+                                return (
+                                    <View key={idx} style={styles.paymentRow}>
+                                        <View style={styles.paymentIconWrap}>
+                                            <Text style={{ fontSize: 14, color: Colors.primary, fontWeight: '800' }}>₹</Text>
+                                        </View>
+                                        <View style={styles.paymentInfo}>
+                                            <Text style={styles.paymentAmount}>₹{(p.amount || 0).toLocaleString()} Received</Text>
+                                            <View style={styles.paymentMeta}>
+                                                <Feather name="clock" size={10} color={Colors.textMuted} />
+                                                <Text style={styles.paymentMetaText}>{dateStr} · {modeLabel}</Text>
                                             </View>
-                                            <Text style={[styles.bannerGradeLabel, { color: ogCfg.color }]}>
-                                                Grade {ogCfg.label} — {ogCfg.fullLabel} Payer
+                                        </View>
+                                        <View style={[styles.paymentStatus, p.isAdvance ? styles.statusAdvance : styles.statusVerified]}>
+                                            <Text style={[styles.paymentStatusText, p.isAdvance ? styles.statusAdvanceText : styles.statusVerifiedText]}>
+                                                {p.isAdvance ? 'Advance' : 'Verified'}
                                             </Text>
                                         </View>
-                                    ) : null;
-                                })()}
-                            </View>
-                            <Text style={styles.sectionHeading}>BOOKING HISTORY</Text>
+                                    </View>
+                                );
+                            })}
                         </View>
-                    }
-                    data={bookings}
-                    keyExtractor={item => item._id}
-                    renderItem={renderBooking}
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <Text style={styles.emptyText}>No bookings for this mandal yet.</Text>
-                        </View>
-                    }
-                    contentContainerStyle={styles.listContent}
-                />
-            </Animated.View>
-        </View>
-    );
-}
+                    ) : null}
 
-function Row({ label, value, valueColor, bold }) {
-    return (
-        <View style={styles.row}>
-            <Text style={styles.rowLabel}>{label}</Text>
-            <Text style={[styles.rowValue, valueColor && { color: valueColor }, bold && { fontWeight: '700' }]}>
-                {value}
-            </Text>
+                    {/* Older bookings listing */}
+                    {user?.plan === 'FREE' ? (
+                        <View style={styles.restrictedSection}>
+                            <Feather name="lock" size={32} color={Colors.textMuted} />
+                            <Text style={styles.restrictedTitle}>
+                                {mandal?.overallGrade && ['B', 'C', 'D'].includes(mandal.overallGrade) ? '⚠️ Potential past dues' : '✅ Reliable history'}
+                            </Text>
+
+                            {mandal?.bookingSummary?.length > 0 && (
+                                <View style={styles.glimpseYears}>
+                                    <Text style={styles.glimpseYearsLabel}>BOOKED YEARS:</Text>
+                                    <View style={styles.glimpseYearRow}>
+                                        {mandal.bookingSummary.map((b, i) => (
+                                            <View key={i} style={styles.glimpseYearChip}>
+                                                <Text style={styles.glimpseYearText}>{b.year}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+
+                            <Text style={styles.restrictedSub}>Upgrade to PRO to see previous vendors, their detailed payment history, and Mandal grades.</Text>
+                            <TouchableOpacity
+                                style={styles.upgradeBtnLarge}
+                                onPress={() => navigation.navigate('UpgradePlan')}
+                            >
+                                <Feather name="shield" size={14} color={Colors.white} style={{ marginRight: 8 }} />
+                                <Text style={styles.upgradeBtnTextLarge}>Unlock Full History</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        bookings.filter(b => b !== myLatestBooking).length > 0 ? (
+                            <View style={styles.historySection}>
+                                <Text style={styles.historySectionLabel}>ALL MURTIKARS</Text>
+                                {bookings.filter(b => b !== myLatestBooking).map(item => {
+                                    const remaining = item.remainingAmount || 0;
+                                    const isFullyPaid = remaining <= 0;
+                                    const extra = remaining < 0 ? Math.abs(remaining) : 0;
+                                    const workshop = item.vendorId?.workshopName || item.vendorId?.name || 'Unknown';
+                                    const murtikar = item.vendorId?.name || 'Murtikar';
+
+                                    return (
+                                        <View key={item._id} style={styles.historyCard}>
+                                            <View style={styles.historyMainRow}>
+                                                <View style={styles.historyTextCol}>
+                                                    <Text style={styles.historyYear}>{item.year}</Text>
+                                                    <Text style={styles.historyName}>{murtikar}</Text>
+                                                    <Text style={styles.historyWorkshop}>{workshop}</Text>
+                                                </View>
+                                                <View style={styles.historyAmountCol}>
+                                                    <View style={[styles.statusBadge, isFullyPaid ? styles.statusBadgePaid : styles.statusBadgeDue]}>
+                                                        <Text style={[styles.statusBadgeText, isFullyPaid ? styles.statusBadgePaidText : styles.statusBadgeDueText]}>
+                                                            {isFullyPaid ? 'Fully Paid' : 'Due'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={[styles.historyAmount, !isFullyPaid && { color: Colors.danger }]}>
+                                                        {(() => {
+                                                            const amt = Math.max(0, remaining);
+                                                            const pct = (item.finalPrice || 0) > 0 ? Math.round((amt / item.finalPrice) * 100) : 0;
+                                                            return `${pct}%`;
+                                                        })()}
+                                                    </Text>
+                                                    <Text style={styles.amountLabel}>{isFullyPaid ? 'paid' : 'due'}</Text>
+                                                    {extra > 0 && (
+                                                        <Text style={styles.extraText}>
+                                                            +{Math.round((extra / (item.finalPrice || 1)) * 100)}% extra
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        ) : null
+                    )}
+
+                </ScrollView>
+            </Animated.View>
+
+            {/* Add New Payment sticky footer — only if I have a booking */}
+            {myLatestBooking ? (
+                <View style={styles.footer}>
+                    <TouchableOpacity
+                        style={styles.addPayBtn}
+                        onPress={() => navigation.navigate('AddPayment', {
+                            bookingId: myLatestBooking._id,
+                            mandalName: mandal?.ganpatiTitle,
+                            remainingAmount: myLatestBooking.remainingAmount,
+                        })}
+                    >
+                        <Text style={{ fontSize: 18, color: Colors.white, fontWeight: '800' }}>₹</Text>
+                        <Text style={styles.addPayText}>Add New Payment</Text>
+                    </TouchableOpacity>
+                    <View style={styles.footerActions}>
+                        <TouchableOpacity style={styles.footerActionBtn} onPress={handleEditPrice}>
+                            <Feather name="edit-2" size={14} color={Colors.primary} />
+                            <Text style={styles.footerActionText}>Edit Price</Text>
+                        </TouchableOpacity>
+                        <View style={styles.footerDivider} />
+                        {/* <TouchableOpacity style={styles.footerActionBtn} onPress={handleCloseBooking}>
+                            <Feather name="lock" size={14} color={Colors.danger} />
+                            <Text style={[styles.footerActionText, { color: Colors.danger }]}>Close Booking</Text>
+                        </TouchableOpacity> */}
+                    </View>
+                </View>
+            ) : (
+                <View style={[styles.footer, { paddingBottom: 32 }]}>
+                    <TouchableOpacity
+                        style={styles.addPayBtn}
+                        onPress={() => navigation.navigate('BookMandal', { preSelectedMandal: mandal })}
+                    >
+                        <Feather name="calendar" size={18} color={Colors.white} />
+                        <Text style={styles.addPayText}>Book This Mandal</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Edit Price Modal */}
+            <Modal
+                visible={priceModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPriceModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Update agreed price</Text>
+                            <TouchableOpacity onPress={() => setPriceModalVisible(false)}>
+                                <Feather name="x" size={20} color={Colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.modalSub}>
+                            Updating the final Price for "{mandal?.ganpatiTitle}".
+                            Current: ₹{myLatestBooking?.finalPrice?.toLocaleString()}
+                        </Text>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.inputPrefix}>₹</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newPrice}
+                                onChangeText={setNewPrice}
+                                keyboardType="numeric"
+                                placeholder="Enter new price"
+                                placeholderTextColor={Colors.textMuted}
+                                autoFocus
+                            />
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={styles.cancelBtn}
+                                onPress={() => setPriceModalVisible(false)}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.submitBtn, actionLoading && styles.btnDisabled]}
+                                onPress={submitPriceUpdate}
+                                disabled={actionLoading}
+                            >
+                                {actionLoading ? (
+                                    <ActivityIndicator size="small" color={Colors.white} />
+                                ) : (
+                                    <Text style={styles.submitText}>Save Changes</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </View>
     );
 }
@@ -212,79 +477,179 @@ function Row({ label, value, valueColor, bold }) {
 const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    listContent: { padding: Spacing.lg, paddingBottom: 40 },
+    container: { padding: Spacing.lg, paddingBottom: 120 },
 
-    mandalBanner: {
-        backgroundColor: Colors.card, borderRadius: Radius.lg,
-        padding: Spacing.xl, alignItems: 'center', marginBottom: Spacing.xl,
-        borderWidth: 1, borderColor: Colors.cardBorder,
-        borderTopWidth: 3, borderTopColor: Colors.accent,
-    },
-    bannerMonogram: {
-        width: 60, height: 60, borderRadius: Radius.full,
-        backgroundColor: Colors.accentMuted, alignItems: 'center', justifyContent: 'center',
-        marginBottom: Spacing.md,
-    },
-    bannerMonoText: { fontSize: Font.xxl, fontWeight: '800', color: Colors.accent },
-    ganpatiTitle: { fontSize: Font.xl, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
-    mandalName: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
-    mandalLocation: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 4 },
-
-    // Overall grade in banner
-    bannerGradeWrap: { alignItems: 'center', marginTop: Spacing.md },
-    bannerGradeBadge: {
-        width: 44, height: 44, borderRadius: 22,
-        alignItems: 'center', justifyContent: 'center',
-        borderWidth: 2.5, marginBottom: 4,
-    },
-    bannerGradeBadgeText: { fontSize: Font.xl, fontWeight: '900' },
-    bannerGradeLabel: { fontSize: Font.sm, fontWeight: '700' },
-
-    sectionHeading: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.4, marginBottom: Spacing.md },
-
-    bookingCard: {
+    // Hero
+    heroSection: {
         backgroundColor: Colors.card, borderRadius: Radius.lg,
         padding: Spacing.lg, marginBottom: Spacing.md,
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+        borderTopWidth: 3, borderTopColor: Colors.primary,
+    },
+    heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    heroText: { flex: 1, marginRight: Spacing.md },
+    heroTitle: { fontSize: Font.xl + 2, fontWeight: '800', color: Colors.textPrimary, marginBottom: 6 },
+    locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+    locationText: { fontSize: Font.xs, color: Colors.textMuted },
+    tagsRow: { flexDirection: 'row', gap: 6 },
+    tag: {
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        backgroundColor: Colors.primaryMuted, borderRadius: Radius.full,
+        paddingHorizontal: 8, paddingVertical: 3,
+    },
+    tagText: { fontSize: 10, color: Colors.primary, fontWeight: '600' },
+    tagGreen: { backgroundColor: Colors.successBg },
+    tagGreenText: { fontSize: 10, color: Colors.success, fontWeight: '600' },
+    monogramCircle: {
+        width: 56, height: 56, borderRadius: Radius.md,
+        backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center',
         borderWidth: 1, borderColor: Colors.cardBorder,
     },
-    bookingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
-    bookingYear: { fontSize: Font.xl, fontWeight: '800', color: Colors.textPrimary },
-    gradePill: { borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
-    gradeText: { fontSize: Font.xs, fontWeight: '700' },
-    separator: { height: 1, backgroundColor: Colors.separator, marginBottom: Spacing.md },
-    row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
-    rowLabel: { fontSize: Font.sm, color: Colors.textMuted },
-    rowValue: { fontSize: Font.sm, color: Colors.textSecondary, fontWeight: '500', maxWidth: '60%', textAlign: 'right' },
+
+    // Booking Summary card
+    summaryCard: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
+        padding: Spacing.lg, marginBottom: Spacing.md,
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
+    summaryTitle: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
+    statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+    statBox: {
+        flex: 1, minWidth: '44%', backgroundColor: Colors.bg,
+        borderRadius: Radius.md, padding: Spacing.md,
+        borderWidth: 1, borderColor: Colors.cardBorder,
+    },
+    statIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+    statLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '600', letterSpacing: 0.5 },
+    statValue: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
+
+    // Payment Health
+    healthCard: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
+        padding: Spacing.lg, marginBottom: Spacing.md,
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    healthHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.md },
+    healthHeading: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2 },
+    healthLabel: { fontSize: Font.sm, fontWeight: '700' },
+    healthBarTrack: {
+        height: 8, backgroundColor: Colors.bg,
+        borderRadius: Radius.full, overflow: 'hidden', marginBottom: 8,
+    },
+    healthBarFill: { height: 8, borderRadius: Radius.full },
+    healthNoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+    healthNote: { fontSize: Font.xs, color: Colors.textMuted, flex: 1, lineHeight: 16 },
+
+    // Recent Payments
+    recentHeader: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        marginBottom: Spacing.md,
+    },
+    recentTitle: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
+    viewHistoryBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    viewHistoryText: { fontSize: Font.sm, color: Colors.primary, fontWeight: '700' },
+
+    paymentRow: {
+        backgroundColor: Colors.card, borderRadius: Radius.md,
+        flexDirection: 'row', alignItems: 'center',
+        padding: Spacing.md, marginBottom: Spacing.sm,
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    paymentIconWrap: {
+        width: 36, height: 36, borderRadius: 18,
+        backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center',
+        marginRight: Spacing.md,
+    },
+    paymentInfo: { flex: 1 },
+    paymentAmount: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
+    paymentMeta: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+    paymentMetaText: { fontSize: Font.xs, color: Colors.textMuted },
+    paymentStatus: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 3 },
+    statusVerified: { backgroundColor: Colors.successBg },
+    statusAdvance: { backgroundColor: Colors.orangeBg, borderWidth: 1, borderColor: Colors.orange + '20' },
+    paymentStatusText: { fontSize: Font.xs, fontWeight: '700' },
+    statusVerifiedText: { color: Colors.success },
+    statusAdvanceText: { color: Colors.orange },
+
+    // Booking history section
+    historySection: { marginTop: Spacing.md },
+    historySectionLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.4, marginBottom: Spacing.md },
+    historyCard: {
+        backgroundColor: Colors.card, paddingVertical: Spacing.md,
+        borderBottomWidth: 1, borderBottomColor: Colors.separator,
+    },
+    historyMainRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    historyTextCol: { flex: 1 },
+    historyYear: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary, marginBottom: 2 },
+    historyName: { fontSize: Font.sm, color: Colors.textSecondary, marginBottom: 2 },
+    historyWorkshop: { fontSize: Font.xs, color: Colors.textMuted },
+
+    historyAmountCol: { alignItems: 'flex-end' },
+    statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full, marginBottom: 4 },
+    statusBadgePaid: { backgroundColor: Colors.successBg },
+    statusBadgeDue: { backgroundColor: Colors.dangerBg },
+    statusBadgeText: { fontSize: 10, fontWeight: '700' },
+    statusBadgePaidText: { color: Colors.success },
+    statusBadgeDueText: { color: Colors.danger },
+
+    historyAmount: { fontSize: Font.lg + 2, fontWeight: '800', color: Colors.textPrimary },
+    amountLabel: { fontSize: Font.xs, color: Colors.textMuted, marginTop: -2 },
+    extraText: { fontSize: Font.sm, color: Colors.success, fontWeight: '700', marginTop: 4 },
+
+    // Footer
+    footer: {
+        backgroundColor: Colors.surface, paddingHorizontal: Spacing.lg,
+        paddingBottom: 24, paddingTop: 12,
+        borderTopWidth: 1, borderTopColor: Colors.separator, ...Shadow.sm,
+    },
     addPayBtn: {
-        marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.accent,
-        borderRadius: Radius.sm, paddingVertical: 10, alignItems: 'center',
+        backgroundColor: Colors.primary, borderRadius: Radius.full,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 8, paddingVertical: 16, marginBottom: 10, ...Shadow.sm,
     },
-    addPayText: { color: Colors.accent, fontWeight: '700', fontSize: Font.sm },
-    empty: { alignItems: 'center', marginTop: 30 },
-    emptyText: { color: Colors.textMuted, fontSize: Font.sm },
+    addPayText: { fontSize: Font.md, fontWeight: '700', color: Colors.white },
+    footerActions: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.xl },
+    footerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12 },
+    footerActionText: { fontSize: Font.sm, color: Colors.primary, fontWeight: '600' },
+    footerDivider: { width: 1, backgroundColor: Colors.separator, marginVertical: 8 },
 
-    // Price History
-    priceHistoryTitle: {
-        fontSize: Font.xs, fontWeight: '700', color: Colors.textMuted,
-        letterSpacing: 1.2, marginTop: Spacing.md, marginBottom: Spacing.sm,
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', padding: Spacing.xl },
+    modalCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xl, ...Shadow.md },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+    modalTitle: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
+    modalSub: { fontSize: Font.xs, color: Colors.textSecondary, marginBottom: Spacing.lg, lineHeight: 16 },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.bg,
+        borderRadius: Radius.md,
+        paddingHorizontal: Spacing.md,
+        borderWidth: 1.5,
+        borderColor: Colors.separator,
+        marginBottom: Spacing.xl,
     },
-    priceHistoryRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: Spacing.sm },
-    priceHistoryDot: {
-        width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.accent,
-        marginTop: 5, marginRight: Spacing.sm,
+    inputPrefix: { fontSize: Font.lg, fontWeight: '700', color: Colors.textMuted, marginRight: 8 },
+    modalInput: { flex: 1, paddingVertical: 14, fontSize: Font.lg, fontWeight: '700', color: Colors.textPrimary },
+    modalActions: { flexDirection: 'row', gap: Spacing.md },
+    cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.separator },
+    cancelText: { color: Colors.textSecondary, fontWeight: '700', fontSize: Font.sm },
+    submitBtn: { flex: 2, backgroundColor: Colors.primary, paddingVertical: 14, alignItems: 'center', borderRadius: Radius.md, ...Shadow.sm },
+    submitText: { color: Colors.white, fontWeight: '800', fontSize: Font.sm },
+    btnDisabled: { opacity: 0.7 },
+    restrictedSection: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.xl,
+        alignItems: 'center', marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder,
+        borderStyle: 'dashed',
     },
-    priceHistoryContent: { flex: 1 },
-    priceHistoryChange: { fontSize: Font.sm, fontWeight: '700', color: Colors.textPrimary },
-    priceHistoryReason: { fontSize: Font.xs, color: Colors.textSecondary, marginTop: 1 },
-    priceHistoryDate: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 1 },
-
-    // Payment Log button (links to PaymentLogsScreen)
-    logBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingVertical: Spacing.sm, marginTop: 4,
-    },
-    logBtnLeft: { flex: 1 },
-    logBtnTitle: { fontSize: Font.sm, fontWeight: '700', color: '#BF360C' },
-    logBtnSub: { fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 },
-    logBtnArrow: { fontSize: 20, color: Colors.accent, marginLeft: Spacing.sm },
+    restrictedTitle: { fontSize: Font.md, fontWeight: '800', color: Colors.textPrimary, marginTop: 12 },
+    restrictedSub: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 18, marginBottom: 20 },
+    upgradeBtnLarge: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.md, ...Shadow.sm },
+    upgradeBtnTextLarge: { color: Colors.white, fontWeight: '700', fontSize: Font.sm },
+    glimpseYears: { alignItems: 'center', marginTop: 12, marginBottom: 8 },
+    glimpseYearsLabel: { fontSize: 9, fontWeight: '800', color: Colors.textMuted, letterSpacing: 1, marginBottom: 6 },
+    glimpseYearRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
+    glimpseYearChip: { backgroundColor: Colors.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: Colors.separator },
+    glimpseYearText: { fontSize: 11, fontWeight: '700', color: Colors.textPrimary },
 });

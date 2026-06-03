@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { Colors, Font, Radius, Spacing, gradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, Shadow, gradeConfig } from '../theme';
 
 export default function MandalCard({ mandal, onPress }) {
     const scale = useRef(new Animated.Value(1)).current;
@@ -39,16 +39,16 @@ export default function MandalCard({ mandal, onPress }) {
 const styles = StyleSheet.create({
     card: {
         flexDirection: 'row', alignItems: 'center',
-        backgroundColor: Colors.card, borderRadius: Radius.md,
+        backgroundColor: Colors.card, borderRadius: Radius.lg,
         padding: Spacing.lg, marginBottom: Spacing.sm,
-        borderWidth: 1, borderColor: Colors.cardBorder,
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
     },
     iconBox: {
         width: 44, height: 44, borderRadius: Radius.full,
-        backgroundColor: Colors.accentMuted, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center',
         marginRight: Spacing.md,
     },
-    iconText: { fontSize: Font.lg, fontWeight: '900', color: Colors.accent },
+    iconText: { fontSize: Font.lg, fontWeight: '900', color: Colors.primary },
     info: { flex: 1 },
     title: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
     name: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2 },

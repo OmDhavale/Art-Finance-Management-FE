@@ -4,12 +4,13 @@ import {
     ScrollView, KeyboardAvoidingView, Platform, Switch,
     Animated, StatusBar, ActivityIndicator, TextInput, RefreshControl,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Font, Radius, Spacing, gradeConfig, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
+import { Colors, Font, Radius, Spacing, Shadow, gradeConfig, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 
 // Only advance paid comes from BOOKING_FIELDS now; prices are handled separately
@@ -22,6 +23,7 @@ export default function BookMandalScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [query, setQuery] = useState('');
+    const [isGuideExpanded, setIsGuideExpanded] = useState(false);
     const [selectedMandal, setSelectedMandal] = useState(null);
     const [expanded, setExpanded] = useState(null); // mandalId of expanded card
     const [booking, setBooking] = useState({
@@ -53,7 +55,7 @@ export default function BookMandalScreen({ navigation }) {
         }
     }, []);
 
-    useEffect(() => { fetchMandals(); }, []);
+    useEffect(() => { fetchMandals(); }, [user?.plan]);
 
     const setB = (key) => (val) => setBooking(b => ({ ...b, [key]: val }));
 
@@ -96,6 +98,14 @@ export default function BookMandalScreen({ navigation }) {
 
         setSubmitting(true);
         try {
+            // Frontend safety check for FREE users (Backend also enforces this)
+            if (user?.plan === 'FREE') {
+                const currentYear = new Date().getFullYear();
+                const res = await api.get('/bookings/my');
+                // Actually, let's just let the backend handle the error and catch it here.
+                // The backend returns a specific message.
+            }
+
             await api.post('/bookings', {
                 mandalId: selectedMandal._id,
                 year: Number(year),
@@ -108,7 +118,19 @@ export default function BookMandalScreen({ navigation }) {
             toast.success('Booking created successfully.', 'Booked');
             setTimeout(() => navigation.navigate('Dashboard'), 1200);
         } catch (err) {
-            toast.error(err?.response?.data?.message || 'Failed to create booking.');
+            const msg = err?.response?.data?.message || 'Failed to create booking.';
+            if (msg.includes("limit reached")) {
+                Alert.alert(
+                    "Limit Reached",
+                    "You've reached the 15 bookings limit for the FREE plan. Upgrade to PRO for unlimited bookings!",
+                    [
+                        { text: "Later", style: "cancel" },
+                        { text: "Upgrade Now", onPress: () => navigation.navigate('UpgradePlan') }
+                    ]
+                );
+            } else {
+                toast.error(msg);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -154,14 +176,29 @@ export default function BookMandalScreen({ navigation }) {
                         {/* Overall grade badge */}
                         {selectedMandal?.overallGrade ? (() => {
                             const ogCfg = getOverallGradeConfig(selectedMandal.overallGrade);
+                            const isFree = user?.plan === 'FREE';
+
                             return ogCfg ? (
                                 <View style={styles.selectedGradeRow}>
-                                    <View style={[styles.overallBadgeLg, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
-                                        <Text style={[styles.overallBadgeLgText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
-                                    </View>
-                                    <Text style={[styles.selectedGradeLabel, { color: ogCfg.color }]}>
-                                        {ogCfg.fullLabel} Payer
-                                    </Text>
+                                    {isFree ? (
+                                        <>
+                                            <View style={[styles.overallBadgeLg, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
+                                                <Feather name="lock" size={16} color={Colors.textMuted} />
+                                            </View>
+                                            <Text style={[styles.selectedGradeLabel, { color: Colors.textMuted }]}>
+                                                {['B', 'C', 'D'].includes(selectedMandal.overallGrade) ? '⚠️ Potential past dues' : '✅ Reliable history'}
+                                            </Text>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <View style={[styles.overallBadgeLg, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
+                                                <Text style={[styles.overallBadgeLgText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
+                                            </View>
+                                            <Text style={[styles.selectedGradeLabel, { color: ogCfg.color }]}>
+                                                {ogCfg.fullLabel} Payer
+                                            </Text>
+                                        </>
+                                    )}
                                 </View>
                             ) : null;
                         })() : (
@@ -176,68 +213,89 @@ export default function BookMandalScreen({ navigation }) {
 
                     {/* Previous Murtikars quick summary */}
                     {selectedMandal?.bookingSummary?.length > 0 && (
-                        <View style={styles.historyCard}>
-                            <View style={styles.historyHeaderRow}>
-                                <Text style={styles.historyLabel}>PREVIOUS MURTIKARS</Text>
-                                <TextInput
-                                    style={styles.historySearch}
-                                    placeholder="Search Year..."
-                                    placeholderTextColor={Colors.textMuted}
-                                    value={historyQuery}
-                                    onChangeText={setHistoryQuery}
-                                />
+                        user?.plan === 'FREE' ? (
+                            <View style={styles.restrictedHistory}>
+                                <Feather name="lock" size={16} color={Colors.textMuted} />
+                                <Text style={styles.restrictedHistoryText}>Upgrade to PRO to view full Mandal history</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')}>
+                                    <Text style={styles.upgradeLink}>Upgrade →</Text>
+                                </TouchableOpacity>
                             </View>
+                        ) : (
+                            <View style={styles.historyCard}>
+                                <View style={styles.historyHeaderRow}>
+                                    <Text style={styles.historyLabel}>PREVIOUS MURTIKARS</Text>
+                                    <TextInput
+                                        style={styles.historySearch}
+                                        placeholder="Search Year..."
+                                        placeholderTextColor={Colors.textMuted}
+                                        value={historyQuery}
+                                        onChangeText={setHistoryQuery}
+                                    />
+                                </View>
 
-                            <ScrollView
-                                style={styles.historyScroll}
-                                showsVerticalScrollIndicator={true}
-                                nestedScrollEnabled={true}
-                            >
-                                {selectedMandal.bookingSummary
-                                    .filter(b =>
+                                <ScrollView
+                                    style={styles.historyScroll}
+                                    showsVerticalScrollIndicator={true}
+                                    nestedScrollEnabled={true}
+                                >
+                                    {selectedMandal.bookingSummary
+                                        .filter(b =>
+                                            !historyQuery ||
+                                            String(b.year).includes(historyQuery) ||
+                                            b.vendorName?.toLowerCase().includes(historyQuery.toLowerCase())
+                                        )
+                                        .map((b, i) => {
+                                            const gc = gradeConfig[b.grade] || gradeConfig.red;
+                                            return (
+                                                <View key={i} style={styles.historyRow}>
+                                                    <View style={styles.historyLeft}>
+                                                        <Text style={styles.historyYear}>{b.year}</Text>
+                                                        <Text style={styles.historyVendor} numberOfLines={1}>{b.vendorName}</Text>
+                                                        {b.workshopName ? <Text style={styles.historyWorkshop} numberOfLines={1}>{b.workshopName}</Text> : null}
+                                                    </View>
+                                                    <View style={styles.historyRight}>
+                                                        <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                            <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                                        </View>
+                                                        <Text style={[styles.historyPending, { color: gc.color }]}>
+                                                            {(() => {
+                                                                const amt = Math.max(0, b.remainingAmount || 0);
+                                                                const pct = (b.finalPrice || 0) > 0 ? Math.round((amt / b.finalPrice) * 100) : 0;
+                                                                return `${pct}% due`;
+                                                            })()}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })
+                                    }
+                                    {selectedMandal.bookingSummary.filter(b =>
                                         !historyQuery ||
                                         String(b.year).includes(historyQuery) ||
                                         b.vendorName?.toLowerCase().includes(historyQuery.toLowerCase())
-                                    )
-                                    .map((b, i) => {
-                                        const gc = gradeConfig[b.grade] || gradeConfig.red;
-                                        return (
-                                            <View key={i} style={styles.historyRow}>
-                                                <View style={styles.historyLeft}>
-                                                    <Text style={styles.historyYear}>{b.year}</Text>
-                                                    <Text style={styles.historyVendor} numberOfLines={1}>{b.vendorName}</Text>
-                                                    {b.workshopName ? <Text style={styles.historyWorkshop} numberOfLines={1}>{b.workshopName}</Text> : null}
-                                                </View>
-                                                <View style={styles.historyRight}>
-                                                    <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                                        <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
-                                                    </View>
-                                                    <Text style={[styles.historyPending, { color: gc.color }]}>
-                                                        ₹{b.remainingAmount.toLocaleString()} due
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        );
-                                    })
-                                }
-                                {selectedMandal.bookingSummary.filter(b =>
-                                    !historyQuery ||
-                                    String(b.year).includes(historyQuery) ||
-                                    b.vendorName?.toLowerCase().includes(historyQuery.toLowerCase())
-                                ).length === 0 && (
-                                        <Text style={styles.historyEmpty}>No matching records found.</Text>
-                                    )}
-                            </ScrollView>
-                        </View>
+                                    ).length === 0 && (
+                                            <Text style={styles.historyEmpty}>No matching records found.</Text>
+                                        )}
+                                </ScrollView>
+                            </View>
+                        )
                     )}
 
                     {/* Year chip picker */}
                     {(() => {
-                        const years = Array.from({ length: 6 }, (_, i) => currentYear + i);
                         const bookingSummary = selectedMandal?.bookingSummary || [];
                         const bookedYearsMap = Array.isArray(bookingSummary)
                             ? bookingSummary.reduce((acc, b) => ({ ...acc, [b.year]: b }), {})
                             : {};
+
+                        const bookedYearsList = Array.isArray(bookingSummary) ? bookingSummary.map(b => b.year) : [];
+                        const maxBooked = bookedYearsList.length > 0 ? Math.max(...bookedYearsList) : currentYear;
+                        const yearsToDisplay = Math.max(10, maxBooked - currentYear + 5); 
+                        const allPotentialYears = Array.from({ length: yearsToDisplay }, (_, i) => currentYear + i);
+                        
+                        // ONLY show years that are NOT already booked
+                        const years = allPotentialYears.filter(yr => !bookedYearsMap[yr]);
 
                         const isYearBooked = bookedYearsMap[booking.year];
 
@@ -252,36 +310,32 @@ export default function BookMandalScreen({ navigation }) {
                                         </Text>
                                     )}
                                 </View>
-                                <View style={styles.yearRow}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.yearScrollContent}
+                                    style={styles.yearSelectorScroll}
+                                >
                                     {years.map(yr => {
                                         const isSelected = booking.year === String(yr);
-                                        const isBooked = !!bookedYearsMap[yr];
                                         return (
                                             <TouchableOpacity
                                                 key={yr}
                                                 style={[
                                                     styles.yearChip,
                                                     isSelected && styles.yearChipSelected,
-                                                    isBooked && !isSelected && styles.yearChipBooked,
-                                                    isSelected && isBooked && styles.yearChipSelectedBooked,
                                                 ]}
                                                 onPress={() => setBooking(b => ({ ...b, year: String(yr) }))}
+                                                activeOpacity={0.7}
                                             >
                                                 <Text style={[
                                                     styles.yearChipText,
                                                     isSelected && styles.yearChipTextSelected,
-                                                    isBooked && !isSelected && styles.yearChipTextBooked,
                                                 ]}>{yr}</Text>
-                                                {isBooked && (
-                                                    <Text style={[
-                                                        styles.yearChipNote,
-                                                        isSelected && { color: Colors.white, opacity: 0.8 },
-                                                    ]}>booked</Text>
-                                                )}
                                             </TouchableOpacity>
                                         );
                                     })}
-                                </View>
+                                </ScrollView>
                             </View>
                         );
                     })()}
@@ -375,79 +429,103 @@ export default function BookMandalScreen({ navigation }) {
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader title="Book Mandal" onBack={() => navigation.goBack()} />
 
-            {/* Search bar */}
-            <View style={styles.searchWrap}>
-                <TextInput
-                    style={styles.searchInput}
-                    value={query}
-                    onChangeText={setQuery}
-                    placeholder="Filter by title, name, area..."
-                    placeholderTextColor={Colors.textMuted}
-                />
-                {query.length > 0 && (
-                    <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
-                        <Text style={styles.clearText}>×</Text>
-                    </TouchableOpacity>
-                )}
+            {/* Search row with Filter toggle */}
+            <View style={styles.searchRow}>
+                <View style={styles.searchWrap}>
+                    <Feather name="search" size={18} color={Colors.textMuted} style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        value={query}
+                        onChangeText={setQuery}
+                        placeholder="Search title, name, area..."
+                        placeholderTextColor={Colors.textMuted}
+                    />
+                    {query.length > 0 && (
+                        <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
+                            <Feather name="x-circle" size={18} color={Colors.textMuted} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+                <TouchableOpacity
+                    style={[styles.filterToggleBtn, isGuideExpanded && styles.filterToggleBtnActive]}
+                    onPress={() => setIsGuideExpanded(!isGuideExpanded)}
+                >
+                    <Feather name="filter" size={20} color={isGuideExpanded ? Colors.white : Colors.textPrimary} />
+                </TouchableOpacity>
             </View>
 
-            {/* Status + Grade filter chips */}
-            <View style={styles.filterSection}>
-                {/* Row 1: Booking status */}
-                <View style={styles.filterRow}>
-                    {[['all', 'All'], ['available', 'Available'], ['booked', 'Booked']].map(([val, label]) => (
-                        <TouchableOpacity
-                            key={val}
-                            style={[styles.filterChip, statusFilter === val && styles.filterChipActive]}
-                            onPress={() => setStatusFilter(val)}
-                        >
-                            <Text style={[styles.filterChipText, statusFilter === val && styles.filterChipTextActive]}>
-                                {label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                {/* Row 2: Grade filter */}
-                <View style={styles.filterRow}>
-                    <TouchableOpacity
-                        style={[styles.filterChip, gradeFilter === 'all' && styles.filterChipActive]}
-                        onPress={() => setGradeFilter('all')}
-                    >
-                        <Text style={[styles.filterChipText, gradeFilter === 'all' && styles.filterChipTextActive]}>Any Grade</Text>
-                    </TouchableOpacity>
-                    {Object.entries(overallGradeConfig).map(([key, cfg]) => (
-                        <TouchableOpacity
-                            key={key}
-                            style={[
-                                styles.filterChip,
-                                gradeFilter === key && { backgroundColor: cfg.bg, borderColor: cfg.borderColor },
-                            ]}
-                            onPress={() => setGradeFilter(prev => prev === key ? 'all' : key)}
-                        >
-                            <Text style={[
-                                styles.filterChipText,
-                                gradeFilter === key && { color: cfg.color, fontWeight: '800' },
-                            ]}>{cfg.label} — {cfg.fullLabel}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
+            {/* Collapsible Dropdown for Filters */}
+            {isGuideExpanded && (
+                <View style={styles.dropdownFiltersContainer}>
 
-            {/* Grade legend */}
-            <View style={styles.legendRow}>
-                {Object.entries(overallGradeConfig).map(([key, cfg]) => (
-                    <View key={key} style={styles.legendItem}>
-                        <View style={[styles.legendBadge, { backgroundColor: cfg.bg, borderColor: cfg.borderColor }]}>
-                            <Text style={[styles.legendBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+                    {/* Status + Grade filter chips */}
+                    <View style={styles.filterSection}>
+                        {/* Row 1: Booking status */}
+                        <View style={styles.filterRow}>
+                            {[['all', 'All'], ['available', 'Available'], ['booked', 'Booked']].map(([val, label]) => (
+                                <TouchableOpacity
+                                    key={val}
+                                    style={[styles.filterChip, statusFilter === val && styles.filterChipActive]}
+                                    onPress={() => setStatusFilter(val)}
+                                >
+                                    <Text style={[styles.filterChipText, statusFilter === val && styles.filterChipTextActive]}>
+                                        {label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
-                        <Text style={styles.legendLabel}>{cfg.fullLabel}</Text>
+                        {/* Row 2: Grade filter */}
+                        <View style={styles.filterRow}>
+                            <TouchableOpacity
+                                style={[styles.filterChip, gradeFilter === 'all' && styles.filterChipActive]}
+                                onPress={() => setGradeFilter('all')}
+                            >
+                                <Text style={[styles.filterChipText, gradeFilter === 'all' && styles.filterChipTextActive]}>Any Grade</Text>
+                            </TouchableOpacity>
+                            {Object.entries(overallGradeConfig).map(([key, cfg]) => (
+                                <TouchableOpacity
+                                    key={key}
+                                    style={[
+                                        styles.filterChip,
+                                        gradeFilter === key && { backgroundColor: cfg.bg, borderColor: cfg.borderColor },
+                                    ]}
+                                    onPress={() => {
+                                        if (user?.plan !== 'PRO') {
+                                            toast.error('Upgrade to PRO to filter by grade.');
+                                            return;
+                                        }
+                                        setGradeFilter(prev => prev === key ? 'all' : key);
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        {user?.plan !== 'PRO' && <Feather name="lock" size={10} color={gradeFilter === key ? cfg.color : Colors.textMuted} />}
+                                        <Text style={[
+                                            styles.filterChipText,
+                                            gradeFilter === key && { color: cfg.color, fontWeight: '800' },
+                                        ]}>{cfg.label}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
-                ))}
-            </View>
+
+                    {/* Grade legend */}
+                    <View style={styles.legendRow}>
+                        {Object.entries(overallGradeConfig).map(([key, cfg]) => (
+                            <View key={key} style={styles.legendItem}>
+                                <View style={[styles.legendBadge, { backgroundColor: cfg.bg, borderColor: cfg.borderColor }]}>
+                                    <Text style={[styles.legendBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+                                </View>
+                                <Text style={styles.legendLabel}>{cfg.fullLabel}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
 
             {loading ? (
                 <View style={styles.center}>
-                    <ActivityIndicator color={Colors.accent} size="large" />
+                    <ActivityIndicator color={Colors.primary} size="large" />
                     <Text style={styles.loadingText}>Loading mandals...</Text>
                 </View>
             ) : (
@@ -460,8 +538,8 @@ export default function BookMandalScreen({ navigation }) {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={() => { setRefreshing(true); fetchMandals(true); }}
-                            colors={[Colors.accent]}
-                            tintColor={Colors.accent}
+                            colors={[Colors.primary]}
+                            tintColor={Colors.primary}
                         />
                     }
                     ListEmptyComponent={
@@ -469,6 +547,13 @@ export default function BookMandalScreen({ navigation }) {
                             <Text style={styles.emptyText}>
                                 {allMandals.length === 0 ? 'No mandals registered yet.' : 'No mandals match your search.'}
                             </Text>
+                            <TouchableOpacity
+                                style={styles.registerLink}
+                                onPress={() => navigation.navigate('RegisterMandal')}
+                            >
+                                <Feather name="plus-circle" size={16} color={Colors.primary} />
+                                <Text style={styles.registerLinkText}>Register New Mandal</Text>
+                            </TouchableOpacity>
                         </View>
                     }
                     renderItem={({ item }) => (
@@ -478,6 +563,8 @@ export default function BookMandalScreen({ navigation }) {
                             expanded={expanded === item._id}
                             onToggle={() => setExpanded(prev => prev === item._id ? null : item._id)}
                             onBook={(yr) => selectMandal(item, yr)}
+                            plan={user?.plan}
+                            navigation={navigation}
                         />
                     )}
                 />
@@ -486,7 +573,9 @@ export default function BookMandalScreen({ navigation }) {
     );
 }
 
-function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
+function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook, plan, navigation }) {
+    const isFree = plan !== 'PRO';
+    const [showAllHistory, setShowAllHistory] = useState(false);
     const scale = useRef(new Animated.Value(1)).current;
     const onIn = () => Animated.spring(scale, { toValue: 0.985, useNativeDriver: true, speed: 40 }).start();
     const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
@@ -506,26 +595,24 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
         : currentYear;
 
     return (
-        <Animated.View style={[styles.card, isDisabled && styles.cardDisabled, { transform: [{ scale }] }]}>
-            {/* Booked banner — show all booked years from current onwards */}
-            {isDisabled && (
-                <View style={styles.bookedBanner}>
-                    <Text style={styles.bookedBannerText}>
-                        ✓ Already Booked for {bannerText}
-                    </Text>
-                </View>
-            )}
-
+        <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
             {/* Card header — tap to expand/collapse */}
             <TouchableOpacity onPress={onToggle} onPressIn={onIn} onPressOut={onOut} activeOpacity={1}>
-                <View style={[styles.cardHeader, isDisabled && styles.cardHeaderDisabled]}>
-                    <View style={[styles.cardInitial, isDisabled && styles.cardInitialDisabled]}>
-                        <Text style={[styles.cardInitialText, isDisabled && styles.cardInitialTextDisabled]}>
-                            {(mandal.ganpatiTitle || 'M').charAt(0).toUpperCase()}
-                        </Text>
+                <View style={styles.cardHeader}>
+                    <View style={{ alignItems: 'center', marginRight: Spacing.md, minWidth: 48, flexShrink: 0 }}>
+                        <View style={[styles.cardInitial, { marginRight: 0 }]}>
+                            <Text style={styles.cardInitialText}>
+                                {(mandal.ganpatiTitle || 'M').charAt(0).toUpperCase()}
+                            </Text>
+                        </View>
+                        {isDisabled && (
+                            <View style={[styles.inlineBookedTag, { alignSelf: 'center', marginTop: 4, marginBottom: 0, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }]}>
+                                <Text style={[styles.inlineBookedTagText, { fontSize: 9, textAlign: 'center' }]} numberOfLines={1}>Booked ✓</Text>
+                            </View>
+                        )}
                     </View>
                     <View style={styles.cardInfo}>
-                        <Text style={[styles.cardTitle, isDisabled && styles.cardTitleDisabled]} numberOfLines={1}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
                             {mandal.ganpatiTitle}
                         </Text>
                         <Text style={styles.cardSub} numberOfLines={1}>{mandal.mandalName}</Text>
@@ -535,20 +622,27 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
                     </View>
                     <View style={styles.cardRight}>
                         {/* Overall O/A/B/C/D grade badge */}
-                        {ogCfg ? (
-                            <View style={[styles.overallBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }, isDisabled && styles.badgeDisabled]}>
-                                <Text style={[styles.overallBadgeText, { color: ogCfg.color }, isDisabled && styles.badgeTextDisabled]}>{ogCfg.label}</Text>
+                        {isFree ? (
+                            <View style={[styles.overallBadge, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
+                                <Feather name="lock" size={14} color={Colors.textMuted} />
+                            </View>
+                        ) : ogCfg ? (
+                            <View style={[styles.overallBadge, { backgroundColor: ogCfg.bg, borderColor: ogCfg.borderColor }]}>
+                                <Text style={[styles.overallBadgeText, { color: ogCfg.color }]}>{ogCfg.label}</Text>
                             </View>
                         ) : (
                             <View style={[styles.overallBadge, { backgroundColor: '#F0F0F0', borderColor: '#DDD' }]}>
                                 <Text style={[styles.overallBadgeText, { color: Colors.textMuted }]}>–</Text>
                             </View>
                         )}
-                        {ogCfg && !isDisabled && (
-                            <Text style={[styles.overallBadgeLabel, { color: ogCfg.color }]}>{ogCfg.fullLabel}</Text>
-                        )}
-                        <Text style={[styles.totalPending, isDisabled && { color: Colors.textMuted }]}>
-                            {isDisabled ? '—' : (mandal.totalPending > 0 ? `₹${mandal.totalPending.toLocaleString()} due` : 'All clear')}
+                        <Text style={styles.totalPending}>
+                            {(() => {
+                                if (isFree) return 'Upgrade to view';
+                                if (!mandal.totalPending || mandal.totalPending <= 0) return 'All clear';
+                                const totalFinal = (mandal.bookingSummary || []).reduce((sum, b) => sum + (b.finalPrice || 0), 0);
+                                const pct = totalFinal > 0 ? Math.round((mandal.totalPending / totalFinal) * 100) : 0;
+                                return `${pct}% due`;
+                            })()}
                         </Text>
                     </View>
                 </View>
@@ -558,33 +652,61 @@ function MandalListCard({ mandal, currentYear, expanded, onToggle, onBook }) {
             {expanded && mandal.bookingSummary?.length > 0 && (
                 <View style={styles.breakdown}>
                     <Text style={styles.breakdownLabel}>ALL MURTIKARS</Text>
-                    {mandal.bookingSummary.map((b, i) => {
-                        const gc = getGradeConfig(b.remainingAmount);
-                        const rawR = b.remainingAmount;
-                        const dispR = Math.max(0, rawR);
-                        const extra = rawR < 0 ? Math.abs(rawR) : 0;
-                        return (
-                            <View key={i} style={styles.breakdownRow}>
-                                <View style={styles.breakdownLeft}>
-                                    <Text style={styles.breakdownYear}>{b.year}</Text>
-                                    <Text style={styles.breakdownVendor}>{b.vendorName}</Text>
-                                    {b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
-                                </View>
-                                <View style={styles.breakdownRight}>
-                                    <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
-                                        <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                    {mandal.bookingSummary
+                        .slice(0, showAllHistory ? undefined : 3)
+                        .map((b, i) => {
+                            const gc = getGradeConfig(b.remainingAmount, b.finalPrice);
+                            const rawR = b.remainingAmount;
+                            const dispR = Math.max(0, rawR);
+                            const extra = rawR < 0 ? Math.abs(rawR) : 0;
+                            return (
+                                <View key={i} style={styles.breakdownRow}>
+                                    <View style={styles.breakdownLeft}>
+                                        <Text style={styles.breakdownYear}>{b.year}</Text>
+                                        <Text style={styles.breakdownVendor}>
+                                            {isFree ? '🔒 Hidden (PRO feature)' : b.vendorName}
+                                        </Text>
+                                        {!isFree && b.workshopName ? <Text style={styles.breakdownWorkshop}>{b.workshopName}</Text> : null}
                                     </View>
-                                    <Text style={[styles.breakdownAmt, { color: gc.color }]}>
-                                        ₹{dispR.toLocaleString()}
-                                    </Text>
-                                    <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
-                                    {extra > 0 && (
-                                        <Text style={styles.breakdownExtra}>+₹{extra.toLocaleString()} extra</Text>
-                                    )}
+                                    <View style={styles.breakdownRight}>
+                                        {isFree ? (
+                                            <TouchableOpacity onPress={() => navigation.navigate('UpgradePlan')} style={styles.lockHint}>
+                                                <Feather name="lock" size={12} color={Colors.primary} />
+                                                <Text style={styles.lockHintText}>Unlock History</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <>
+                                                <View style={[styles.miniPill, { backgroundColor: gc.bg }]}>
+                                                    <Text style={[styles.miniPillText, { color: gc.color }]}>{gc.label}</Text>
+                                                </View>
+                                                <Text style={[styles.breakdownAmt, { color: gc.color }]}>
+                                                    {(() => {
+                                                        const pct = (b.finalPrice || 0) > 0 ? Math.round((dispR / b.finalPrice) * 100) : 0;
+                                                        return `${pct}%`;
+                                                    })()}
+                                                </Text>
+                                                <Text style={styles.breakdownAmtLabel}>{extra > 0 ? 'paid' : 'due'}</Text>
+                                                {extra > 0 && (
+                                                    <Text style={styles.breakdownExtra}>
+                                                        +{Math.round((extra / (b.finalPrice || 1)) * 100)}% extra
+                                                    </Text>
+                                                )}
+                                            </>
+                                        )}
+                                    </View>
                                 </View>
-                            </View>
-                        );
-                    })}
+                            );
+                        })}
+                    {mandal.bookingSummary.length > 3 && (
+                        <TouchableOpacity 
+                            style={styles.viewMoreHistory} 
+                            onPress={() => setShowAllHistory(!showAllHistory)}
+                        >
+                            <Text style={styles.viewMoreText}>
+                                {showAllHistory ? 'Show Recent Only' : `View All ${mandal.bookingSummary.length} Records →`}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             )}
 
@@ -633,34 +755,56 @@ const styles = StyleSheet.create({
         borderWidth: 1.5, borderColor: Colors.inputBorder,
         backgroundColor: Colors.surface,
     },
-    filterChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+    filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
     filterChipText: { fontSize: Font.xs, fontWeight: '600', color: Colors.textSecondary },
     filterChipTextActive: { color: Colors.white },
 
     // Disabled card (already booked this year)
     cardDisabled: { opacity: 0.72 },
     bookedBanner: {
-        backgroundColor: '#E8F5E9', paddingHorizontal: Spacing.lg, paddingVertical: 6,
-        borderBottomWidth: 1, borderBottomColor: '#C8E6C9',
+        backgroundColor: '#D1FAE5', paddingHorizontal: Spacing.lg, paddingVertical: 6,
+        borderBottomWidth: 1, borderBottomColor: '#6EE7B7',
     },
-    bookedBannerText: { fontSize: Font.xs, fontWeight: '700', color: '#2E7D32' },
+    bookedBannerText: { fontSize: Font.xs, fontWeight: '700', color: '#065F46' },
     cardHeaderDisabled: { backgroundColor: '#FAFAFA' },
-    cardInitialDisabled: { backgroundColor: '#E0E0E0' },
-    cardInitialTextDisabled: { color: '#9E9E9E' },
+    cardInitialDisabled: { backgroundColor: '#E2E8F0' },
+    cardInitialTextDisabled: { color: '#94A3B8' },
     cardTitleDisabled: { color: Colors.textMuted },
     badgeDisabled: { opacity: 0.5 },
     badgeTextDisabled: {},
     emptyText: { color: Colors.textMuted, fontSize: Font.sm, textAlign: 'center' },
 
-    searchWrap: {
+    searchRow: {
         flexDirection: 'row', alignItems: 'center',
-        marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs,
-        backgroundColor: Colors.inputBg, borderRadius: Radius.sm,
-        borderWidth: 1.5, borderColor: Colors.inputBorder,
-        paddingHorizontal: Spacing.md,
+        marginHorizontal: Spacing.lg, marginTop: Spacing.md, gap: 10,
+        marginBottom: Spacing.md,
     },
+    searchWrap: {
+        flex: 1, flexDirection: 'row', alignItems: 'center',
+        backgroundColor: Colors.white, borderRadius: Radius.md,
+        borderWidth: 1, borderColor: Colors.cardBorder,
+        paddingHorizontal: Spacing.md, ...Shadow.sm,
+    },
+    searchIcon: { marginRight: 8 },
+    dropdownFiltersContainer: {
+        marginHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+        backgroundColor: Colors.white, borderRadius: Radius.md,
+        borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: Spacing.md,
+        ...Shadow.sm,
+    },
+    filterToggleBtn: {
+        width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.white,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
+    },
+    filterToggleBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    inlineBookedTag: {
+        backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2,
+        borderRadius: 4, alignSelf: 'flex-start', marginBottom: 2,
+    },
+    inlineBookedTagText: { fontSize: 9, fontWeight: '700', color: '#065F46' },
     searchInput: {
-        flex: 1, height: 44, fontSize: Font.sm,
+        flex: 1, height: 48, fontSize: Font.sm,
         color: Colors.textPrimary, paddingVertical: 0,
     },
     clearBtn: { paddingLeft: 8 },
@@ -670,7 +814,7 @@ const styles = StyleSheet.create({
     legendRow: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
         marginHorizontal: Spacing.lg, marginBottom: Spacing.sm,
-        backgroundColor: Colors.card, borderRadius: Radius.sm,
+        backgroundColor: Colors.card, borderRadius: Radius.md,
         borderWidth: 1, borderColor: Colors.cardBorder,
         paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm,
     },
@@ -688,16 +832,15 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: Colors.card, borderRadius: Radius.lg,
         marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.cardBorder,
-        overflow: 'hidden',
-        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+        overflow: 'hidden', ...Shadow.sm,
     },
     cardHeader: { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg },
     cardInitial: {
         width: 46, height: 46, borderRadius: Radius.full,
-        backgroundColor: Colors.accentMuted, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center',
         marginRight: Spacing.md, flexShrink: 0,
     },
-    cardInitialText: { fontSize: Font.lg, fontWeight: '900', color: Colors.accent },
+    cardInitialText: { fontSize: Font.lg, fontWeight: '900', color: Colors.primary },
     cardInfo: { flex: 1, marginRight: Spacing.sm },
     cardTitle: { fontSize: Font.md, fontWeight: '700', color: Colors.textPrimary },
     cardSub: { fontSize: Font.sm, color: Colors.textSecondary, marginTop: 1 },
@@ -718,7 +861,7 @@ const styles = StyleSheet.create({
     breakdown: {
         borderTopWidth: 1, borderTopColor: Colors.separator,
         paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm,
-        backgroundColor: '#FAFAF8',
+        backgroundColor: Colors.bg,
     },
     breakdownLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2, marginBottom: Spacing.sm },
     breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: Colors.separator },
@@ -729,24 +872,32 @@ const styles = StyleSheet.create({
     breakdownRight: { alignItems: 'flex-end' },
     breakdownAmt: { fontSize: Font.md, fontWeight: '700', marginTop: 2 },
     breakdownAmtLabel: { fontSize: Font.xs, color: Colors.textMuted },
-    breakdownExtra: { fontSize: 10, fontWeight: '700', color: '#1B5E20', marginTop: 1 },
+    breakdownExtra: { fontSize: 10, fontWeight: '700', color: '#065F46', marginTop: 1 },
     miniPill: { borderRadius: Radius.full, paddingHorizontal: 6, paddingVertical: 2 },
     miniPillText: { fontSize: 10, fontWeight: '700' },
     noHistory: { fontSize: Font.sm, color: Colors.textMuted, paddingBottom: Spacing.sm },
 
     bookBtn: {
-        backgroundColor: Colors.accent, marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
-        borderRadius: Radius.sm, paddingVertical: 13, alignItems: 'center',
+        backgroundColor: Colors.primary, marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
+        borderRadius: Radius.full, paddingVertical: 14, alignItems: 'center',
+        ...Shadow.sm,
     },
     bookBtnText: { color: Colors.white, fontWeight: '700', fontSize: Font.sm, letterSpacing: 0.5 },
 
-    // Step 2 — booking form styles
+    registerLink: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        marginTop: Spacing.lg, paddingVertical: 8, paddingHorizontal: 16,
+        backgroundColor: Colors.primaryMuted, borderRadius: Radius.full,
+    },
+    registerLinkText: { fontSize: Font.sm, fontWeight: '700', color: Colors.primary },
+
+    // Step 2 — New Booking form (matches "New Booking" mockup)
     formContainer: { padding: Spacing.xl },
+
+    // Section grouping card (Mandal Details / Murti & Pricing)
     selectedCard: {
         backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.lg,
-        marginBottom: Spacing.xl, borderWidth: 1, borderColor: Colors.cardBorder,
-        borderLeftWidth: 3, borderLeftColor: Colors.accent,
-        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+        marginBottom: Spacing.xl, borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
     },
     selectedLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2, marginBottom: 6 },
     selectedTitle: { fontSize: Font.lg, fontWeight: '800', color: Colors.textPrimary },
@@ -764,17 +915,16 @@ const styles = StyleSheet.create({
 
     historyCard: {
         backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.lg,
-        marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.cardBorder,
-        shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+        marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.cardBorder, ...Shadow.sm,
     },
     historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
     historyLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2 },
     historySearch: {
         fontSize: Font.xs, color: Colors.textPrimary,
-        backgroundColor: Colors.inputBg, borderRadius: Radius.xs,
+        backgroundColor: Colors.inputBg, borderRadius: Radius.sm,
         paddingHorizontal: 8, paddingVertical: 4,
-        borderWidth: 1, borderColor: Colors.inputBorder,
-        width: 120, height: 30,
+        borderWidth: 1.5, borderColor: Colors.inputBorder,
+        width: 120, height: 32,
     },
     historyScroll: { maxHeight: 240 },
     historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.separator },
@@ -784,6 +934,13 @@ const styles = StyleSheet.create({
     historyWorkshop: { fontSize: Font.xs, color: Colors.textMuted },
     historyRight: { alignItems: 'flex-end' },
     historyPending: { fontSize: Font.xs, fontWeight: '600', marginTop: 2 },
+    restrictedHistory: {
+        backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.md,
+        flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.lg,
+        borderWidth: 1, borderColor: Colors.cardBorder, borderStyle: 'dashed',
+    },
+    restrictedHistoryText: { fontSize: 11, color: Colors.textMuted, flex: 1, fontWeight: '600' },
+    upgradeLink: { fontSize: 11, fontWeight: '800', color: Colors.primary },
     historyEmpty: { fontSize: Font.xs, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.md, fontStyle: 'italic' },
 
     btn: { marginTop: Spacing.md },
@@ -791,8 +948,8 @@ const styles = StyleSheet.create({
     // Negotiated Price toggle row
     toggleRow: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: Colors.card, borderRadius: Radius.sm,
-        borderWidth: 1, borderColor: Colors.cardBorder,
+        backgroundColor: Colors.card, borderRadius: Radius.md,
+        borderWidth: 1.5, borderColor: Colors.cardBorder,
         paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
         marginBottom: Spacing.md,
     },
@@ -804,27 +961,34 @@ const styles = StyleSheet.create({
     yearSection: { marginBottom: Spacing.xl },
     yearHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     yearLabel: { fontSize: Font.xs, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1.2 },
-    bookedWarning: { fontSize: 10, fontWeight: '700', color: '#D32F2F', backgroundColor: '#FFEBEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-    yearRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    bookedWarning: {
+        fontSize: 10, fontWeight: '700', color: Colors.danger,
+        backgroundColor: Colors.dangerBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    },
+    yearRow: { flexDirection: 'row' },
+    yearSelectorScroll: { marginHorizontal: -Spacing.xl, paddingHorizontal: Spacing.xl },
+    yearScrollContent: { paddingRight: Spacing.xl + Spacing.lg, gap: 10, paddingVertical: 4 },
     yearChip: {
-        flex: 1, minWidth: '10%',
-        paddingVertical: 1, borderRadius: Radius.md,
+        width: 72, height: 48, borderRadius: Radius.md,
         backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.inputBorder,
         alignItems: 'center', justifyContent: 'center',
     },
-    yearChipSelected: {
-        backgroundColor: Colors.accent, borderColor: Colors.accent,
-    },
-    yearChipSelectedBooked: {
-        backgroundColor: '#D32F2F', borderColor: '#D32F2F',
-    },
-    yearChipBooked: {
-        backgroundColor: '#F5F5F5', borderColor: '#EEE', opacity: 0.6,
-    },
-    yearChipText: { fontSize: Font.md, fontWeight: '700', color: Colors.textSecondary },
+    yearChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary, ...Shadow.sm },
+    yearChipSelectedBooked: { backgroundColor: Colors.danger, borderColor: Colors.danger },
+    yearChipBooked: { backgroundColor: Colors.bg, borderColor: Colors.separator, opacity: 0.6 },
+    yearChipText: { fontSize: Font.md, fontWeight: '800', color: Colors.textSecondary },
     yearChipTextSelected: { color: Colors.white },
     yearChipTextBooked: { color: Colors.textMuted },
-    yearChipNote: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', marginTop: 2, color: Colors.textMuted },
+    yearChipNote: { fontSize: 8, fontWeight: '800', textTransform: 'uppercase', marginTop: 1, color: Colors.textMuted },
 
-    bookBtnNext: { backgroundColor: Colors.textPrimary, marginTop: -Spacing.xs },
+    bookBtnNext: { backgroundColor: Colors.textSecondary, marginTop: -Spacing.xs },
+    lockHint: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F9FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#BAE6FD' },
+    lockHintText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+
+    viewMoreHistory: {
+        paddingVertical: 12, alignItems: 'center', marginTop: 4,
+    },
+    viewMoreText: {
+        fontSize: Font.xs, fontWeight: '800', color: Colors.primary, letterSpacing: 0.5,
+    },
 });

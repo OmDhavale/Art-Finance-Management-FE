@@ -1,5 +1,5 @@
 import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DashboardScreen from '../screens/DashboardScreen';
 import BookMandalScreen from '../screens/BookMandalScreen';
 import MandalSearchScreen from '../screens/MandalSearchScreen';
@@ -9,21 +9,42 @@ import RegisterMandalScreen from '../screens/RegisterMandalScreen';
 import AddManagerScreen from '../screens/AddManagerScreen';
 import MyBookingsScreen from '../screens/MyBookingsScreen';
 import PaymentLogsScreen from '../screens/PaymentLogsScreen';
+import WorkshopDetailsScreen from '../screens/WorkshopDetailsScreen';
+import UpgradePlanScreen from '../screens/UpgradePlanScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
+import AnimatedWrapper from '../components/AnimatedWrapper';
+import BottomTab from '../components/BottomTab';
 
-const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+// HOC to wrap screens with AnimatedWrapper and pass index
+const withAnimation = (Component, index) => (props) => (
+    <AnimatedWrapper index={index}>
+        <Component {...props} />
+    </AnimatedWrapper>
+);
 
 export default function AppNavigator() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Dashboard" component={DashboardScreen} />
-            <Stack.Screen name="AddManager" component={AddManagerScreen} />
-            <Stack.Screen name="RegisterMandal" component={RegisterMandalScreen} />
-            <Stack.Screen name="BookMandal" component={BookMandalScreen} />
-            <Stack.Screen name="MyBookings" component={MyBookingsScreen} />
-            <Stack.Screen name="SearchMandal" component={MandalSearchScreen} />
-            <Stack.Screen name="MandalDetails" component={MandalDetailsScreen} />
-            <Stack.Screen name="AddPayment" component={AddPaymentScreen} />
-            <Stack.Screen name="PaymentLogs" component={PaymentLogsScreen} />
-        </Stack.Navigator>
+        <Tab.Navigator
+            tabBar={props => <BottomTab {...props} />}
+            screenOptions={{ headerShown: false }}
+        >
+            {/* Primary Navigation Tabs */}
+            <Tab.Screen name="Dashboard" component={withAnimation(DashboardScreen, 0)} />
+            <Tab.Screen name="SearchMandal" component={withAnimation(MandalSearchScreen, 1)} />
+            <Tab.Screen name="BookMandal" component={withAnimation(BookMandalScreen, 2)} />
+            <Tab.Screen name="MyBookings" component={withAnimation(MyBookingsScreen, 3)} />
+            <Tab.Screen name="WorkshopDetails" component={withAnimation(WorkshopDetailsScreen, 4)} />
+
+            {/* Secondary Screens */}
+            <Tab.Screen name="MandalDetails" component={withAnimation(MandalDetailsScreen, 5)} />
+            <Tab.Screen name="AddPayment" component={withAnimation(AddPaymentScreen, 6)} />
+            <Tab.Screen name="PaymentLogs" component={withAnimation(PaymentLogsScreen, 7)} />
+            <Tab.Screen name="RegisterMandal" component={withAnimation(RegisterMandalScreen, 8)} />
+            <Tab.Screen name="AddManager" component={withAnimation(AddManagerScreen, 9)} />
+            <Tab.Screen name="UpgradePlan" component={withAnimation(UpgradePlanScreen, 10)} />
+            <Tab.Screen name="Onboarding" component={OnboardingScreen} />
+        </Tab.Navigator>
     );
 }
