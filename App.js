@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { ActivityIndicator, View, StyleSheet, StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -45,14 +46,16 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </ToastProvider>
+    <SafeAreaProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+            <RootNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </ToastProvider>
+    </SafeAreaProvider>
   );
 }
 

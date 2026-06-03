@@ -1,14 +1,18 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow, Radius, Spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
-const BAR_HEIGHT = Platform.OS === 'ios' ? 90 : 70;
+const BASE_BAR_HEIGHT = Platform.OS === 'ios' ? 65 : 70;
 const HIGHLIGHT_HEIGHT = 52;
-const BOTTOM_INSET = Platform.OS === 'ios' ? 25 : 0;
 
 export default function BottomTab({ state, descriptors, navigation }) {
+    const insets = useSafeAreaInsets();
+    const bottomInset = insets.bottom;
+    const barHeight = BASE_BAR_HEIGHT + bottomInset;
+
     // These are the main tabs we want to show in the UI
     const mainTabs = [
         { name: 'Dashboard', label: 'Home', iconName: 'home' },
@@ -36,10 +40,10 @@ export default function BottomTab({ state, descriptors, navigation }) {
         }
     }, [activeVisualIndex, tabWidth]);
 
-    const highlightTop = (BAR_HEIGHT - BOTTOM_INSET - HIGHLIGHT_HEIGHT) / 2;
+    const highlightTop = (BASE_BAR_HEIGHT - HIGHLIGHT_HEIGHT) / 2;
 
     return (
-        <View style={[styles.bar, { height: BAR_HEIGHT, paddingBottom: BOTTOM_INSET }]}>
+        <View style={[styles.bar, { height: barHeight, paddingBottom: bottomInset }]}>
             {/* Sliding Background Highlight */}
             <Animated.View
                 style={[
