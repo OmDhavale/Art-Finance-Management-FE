@@ -9,6 +9,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing, Shadow, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
 import { useAuth } from '../context/AuthContext';
+import { fuzzySearchMatch } from '../utils/phoneticMatcher';
 
 export default function MandalSearchScreen({ navigation }) {
     const { user } = useAuth();
@@ -40,13 +41,8 @@ export default function MandalSearchScreen({ navigation }) {
     const filtered = allMandals.filter(m => {
         // Text search
         if (query.trim()) {
-            const q = query.toLowerCase();
-            const textMatch =
-                m.ganpatiTitle?.toLowerCase().includes(q) ||
-                m.mandalName?.toLowerCase().includes(q) ||
-                m.area?.toLowerCase().includes(q) ||
-                m.city?.toLowerCase().includes(q);
-            if (!textMatch) return false;
+            const combinedText = `${m.ganpatiTitle || ''} ${m.mandalName || ''} ${m.area || ''} ${m.city || ''}`;
+            if (!fuzzySearchMatch(query, combinedText)) return false;
         }
         // Grade filter
         if (gradeFilter !== 'all' && m.overallGrade !== gradeFilter) return false;

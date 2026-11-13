@@ -12,6 +12,7 @@ import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Font, Radius, Spacing, Shadow, gradeConfig, getGradeConfig, overallGradeConfig, getOverallGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
+import { fuzzySearchMatch } from '../utils/phoneticMatcher';
 
 // Only advance paid comes from BOOKING_FIELDS now; prices are handled separately
 const ADVANCE_FIELD = { key: 'advancePaid', label: 'Advance Paid (₹)', placeholder: 'Enter advance amount (₹)', keyboard: 'numeric' };
@@ -140,13 +141,8 @@ export default function BookMandalScreen({ navigation }) {
     const filtered = allMandals.filter(m => {
         // Text search
         if (query.trim()) {
-            const q = query.toLowerCase();
-            const textMatch =
-                m.ganpatiTitle?.toLowerCase().includes(q) ||
-                m.mandalName?.toLowerCase().includes(q) ||
-                m.area?.toLowerCase().includes(q) ||
-                m.city?.toLowerCase().includes(q);
-            if (!textMatch) return false;
+            const combinedText = `${m.ganpatiTitle || ''} ${m.mandalName || ''} ${m.area || ''} ${m.city || ''}`;
+            if (!fuzzySearchMatch(query, combinedText)) return false;
         }
         // Status filter — check if mandal has a booking for the current year
         const isBookedThisYear = m.bookingSummary?.some(b => b.year === currentYear);

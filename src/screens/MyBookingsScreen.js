@@ -11,6 +11,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Font, Radius, Spacing, Shadow, gradeConfig, getGradeConfig } from '../theme';
 import { toast } from '../utils/toast';
+import { fuzzySearchMatch } from '../utils/phoneticMatcher';
 
 export default function MyBookingsScreen({ navigation }) {
     const { user } = useAuth();
@@ -114,8 +115,7 @@ export default function MyBookingsScreen({ navigation }) {
     const filteredBookings = bookings.filter(b => {
         const matchesYear = !selectedYear || String(b.year) === selectedYear;
         const matchesSearch = !searchQuery ||
-            b.mandalId?.ganpatiTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            b.mandalId?.mandalName?.toLowerCase().includes(searchQuery.toLowerCase());
+            fuzzySearchMatch(searchQuery, `${b.mandalId?.ganpatiTitle || ''} ${b.mandalId?.mandalName || ''}`);
         return matchesYear && matchesSearch;
     });
 

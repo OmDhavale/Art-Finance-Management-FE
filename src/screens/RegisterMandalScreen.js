@@ -11,7 +11,7 @@ import InputField from '../components/InputField';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
 import { toast } from '../utils/toast';
-import { getSimilarity } from '../utils/phoneticMatcher';
+import { tokenSortSimilarity } from '../utils/phoneticMatcher';
 
 export default function RegisterMandalScreen({ navigation }) {
     const [form, setForm] = useState({ ganpatiTitle: '', mandalName: '', area: '', city: '' });
@@ -45,14 +45,14 @@ export default function RegisterMandalScreen({ navigation }) {
             let matchReason = '';
 
             if (mName && item.mandalName) {
-                const sim = getSimilarity(mName, item.mandalName);
+                const sim = tokenSortSimilarity(mName, item.mandalName);
                 if (sim >= 0.8) {
                     isMatch = true;
                     matchReason = `Similar Mandal Name (${Math.round(sim * 100)}% match)`;
                 }
             }
             if (gTitle && item.ganpatiTitle) {
-                const sim = getSimilarity(gTitle, item.ganpatiTitle);
+                const sim = tokenSortSimilarity(gTitle, item.ganpatiTitle);
                 if (sim >= 0.8) {
                     isMatch = true;
                     matchReason = `Similar Ganpati Title (${Math.round(sim * 100)}% match)`;
