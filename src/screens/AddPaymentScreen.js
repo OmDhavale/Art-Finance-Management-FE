@@ -80,7 +80,7 @@ export default function AddPaymentScreen({ route, navigation }) {
                 <Text style={styles.fieldLabel}>Payment Amount</Text>
                 <View style={styles.amountWrap}>
                     <View style={styles.rupeeIcon}>
-                        <Feather name="indian-rupee" size={16} color={Colors.textMuted} />
+                        <Text style={styles.rupeeText}>₹</Text>
                     </View>
                     <InputField
                         value={amount}
@@ -91,7 +91,6 @@ export default function AddPaymentScreen({ route, navigation }) {
                         style={[styles.amountInput, { marginBottom: 0 }]}
                     />
                 </View>
-
                 {/* Payment mode chips */}
                 <Text style={[styles.fieldLabel, { marginTop: Spacing.lg }]}>Payment Mode</Text>
                 <View style={styles.modeRow}>
