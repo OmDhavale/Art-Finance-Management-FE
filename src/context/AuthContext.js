@@ -18,7 +18,18 @@ export const AuthProvider = ({ children }) => {
                 const savedUser = await storage.getItem('user');
                 if (savedToken && savedUser) {
                     setToken(savedToken);
-                    setUser(JSON.parse(savedUser));
+                    const cachedUser = JSON.parse(savedUser);
+                    setUser(cachedUser);
+                    // Refresh the server-authoritative subscription entitlement on app launch.
+                    try {
+                        const billing = await api.get('/billing/status');
+                        const refreshedUser = { ...cachedUser, ...billing.data.data };
+                        await storage.setItem('user', JSON.stringify(refreshedUser));
+                        setUser(refreshedUser);
+                    } catch (billingError) {
+                        // Keep the cached session available if the API is temporarily offline.
+                        console.warn('Billing status refresh skipped:', billingError?.message);
+                    }
                 }
 
             } catch (e) {
