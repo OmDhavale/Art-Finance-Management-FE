@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
+    View, Text, StyleSheet, TouchableOpacity,
     ScrollView, StatusBar, ActivityIndicator, Alert, Platform, Linking
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
