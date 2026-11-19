@@ -11,7 +11,12 @@ const BASE_HOST = Platform.OS === 'android' ? DEV_MACHINE_IP : 'localhost';
 
 const api = axios.create({
     //baseURL: `http://${BASE_HOST}:5000/api`,
-    baseURL: `https://art-finance-management.onrender.com/api`,
+
+    // GBills backend (Google Play Billing version):
+    // baseURL: `https://art-finance-management.onrender.com/api`,
+
+    // V2RA backend (Razorpay version) — update this URL before deploying
+    baseURL: `https://art-finance-management-v2ra.onrender.com/api`,
     headers: {
         'Content-Type': 'application/json',
     },

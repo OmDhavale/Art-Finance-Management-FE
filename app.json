@@ -27,8 +27,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-asset",
-      "expo-iap"
+      "expo-asset"
     ],
     "extra": {
       "eas": {

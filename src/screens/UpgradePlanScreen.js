@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ScrollView, StatusBar, ActivityIndicator, Alert, Platform, Linking
+    ScrollView, ActivityIndicator, Alert, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { useAuth } from '../context/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
@@ -12,7 +13,6 @@ import api from '../api/api';
 import storage from '../utils/storage';
 import { toast } from '../utils/toast';
 import { Image } from 'react-native';
-import { useIAP } from 'expo-iap';
 
 const FeatureItem = ({ text, included, isProOnly }) => (
     <View style={styles.featureRow}>
@@ -28,198 +28,204 @@ const FeatureItem = ({ text, included, isProOnly }) => (
     </View>
 );
 
-const PRO_PRODUCT_ID = 'artist_finance_pro_yearly';
+/**
+ * Builds the inline HTML page that loads Razorpay Checkout.js
+ * and auto-opens the payment modal.
+ */
+const buildCheckoutHTML = ({ orderId, keyId, amount, currency, userName, userContact, appName, description }) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh;
+      background: #F1F5F9;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .loader {
+      text-align: center; color: #475569;
+    }
+    .loader p { margin-top: 12px; font-size: 14px; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #E2E8F0;
+      border-top: 4px solid #F97316;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Opening Razorpay…</p>
+  </div>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    var options = {
+      key: "${keyId}",
+      amount: ${amount},
+      currency: "${currency}",
+      name: "${appName}",
+      description: "${description}",
+      order_id: "${orderId}",
+      prefill: {
+        name: "${(userName || '').replace(/"/g, '\\"')}",
+        contact: "${(userContact || '').replace(/"/g, '\\"')}"
+      },
+      theme: { color: "#F97316" },
+      handler: function(response) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: "PAYMENT_SUCCESS",
+          data: {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature
+          }
+        }));
+      },
+      modal: {
+        ondismiss: function() {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: "PAYMENT_DISMISSED"
+          }));
+        }
+      }
+    };
+
+    // Small delay to let the WebView settle before opening
+    setTimeout(function() {
+      try {
+        var rzp = new Razorpay(options);
+        rzp.on('payment.failed', function(response) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: "PAYMENT_FAILED",
+            data: {
+              code: response.error.code,
+              description: response.error.description,
+              reason: response.error.reason
+            }
+          }));
+        });
+        rzp.open();
+      } catch(e) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: "PAYMENT_ERROR",
+          data: { message: e.message }
+        }));
+      }
+    }, 600);
+  </script>
+</body>
+</html>
+`;
 
 export default function UpgradePlanScreen({ navigation }) {
     const { user, setUser } = useAuth();
     const [loading, setLoading] = useState(false);
-    const [restoring, setRestoring] = useState(false);
-    const [pendingPurchase, setPendingPurchase] = useState(null);
-    const processingTokens = useRef(new Set());
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [checkoutHTML, setCheckoutHTML] = useState('');
+    const isVerifying = useRef(false);
 
-    const handlePurchaseError = useCallback((error) => {
-        const message = error?.message || 'Google Play could not complete the purchase.';
-        if (!String(message).toLowerCase().includes('cancel')) toast.error(message);
-        setLoading(false);
-    }, []);
-
-    const { connected, subscriptions, fetchProducts, requestPurchase,
-        finishTransaction, getAvailablePurchases, availablePurchases } = useIAP({
-            onPurchaseSuccess: (purchase) => setPendingPurchase(purchase),
-            onPurchaseError: handlePurchaseError,
-            onError: (error) => console.warn('Google Play Billing:', error),
-        });
-
-    const proSubscription = subscriptions.find((item) => item.id === PRO_PRODUCT_ID);
-
-    const verifyAndFinish = useCallback(async (purchase) => {
-        const token = purchase?.purchaseToken;
-        const productId = purchase?.productId;
-        if (!token || productId !== PRO_PRODUCT_ID) {
-            throw new Error('Google Play did not return a valid subscription purchase token.');
-        }
-        if (processingTokens.current.has(token)) return;
-        processingTokens.current.add(token);
+    /**
+     * Step 1: Call backend to create a Razorpay order, then open the
+     * WebView-based checkout modal with the order details.
+     */
+    const handleBuyPro = useCallback(async () => {
+        if (isVerifying.current) return;
         setLoading(true);
         try {
-            const response = await api.post('/billing/verify-purchase', {
-                purchaseToken: token,
-                productId,
-            });
-            if (!response.data?.success || !response.data?.data?.user) {
-                throw new Error(response.data?.message || 'Purchase verification is still pending.');
+            const { data: res } = await api.post('/billing/razorpay/create-order');
+            if (!res?.success || !res?.data?.orderId) {
+                throw new Error(res?.message || 'Could not create payment order.');
             }
-            const updatedUser = response.data.data.user;
-            await storage.setItem('user', JSON.stringify(updatedUser));
-            setUser(updatedUser);
-            // Complete the Play transaction only after our backend has verified it.
-            await finishTransaction({ purchase, isConsumable: false });
-            toast.success('PRO activated successfully!');
-            navigation.goBack();
+
+            const { orderId, amount, currency, keyId, customer } = res.data;
+
+            const html = buildCheckoutHTML({
+                orderId,
+                keyId,
+                amount,
+                currency,
+                userName: customer?.name || user?.name || '',
+                userContact: customer?.contact || user?.phone || '',
+                appName: 'Artist Finance Management',
+                description: '1 Year PRO Subscription',
+            });
+
+            setCheckoutHTML(html);
+            setShowCheckout(true);
         } catch (error) {
-            processingTokens.current.delete(token);
-            const message = error.response?.data?.message || error.message || 'Could not verify your purchase.';
+            const message = error.response?.data?.message || error.message || 'Could not initiate payment.';
             toast.error(message);
         } finally {
             setLoading(false);
-            setRestoring(false);
-            setPendingPurchase(null);
         }
-    }, [finishTransaction, navigation, setUser]);
+    }, [user]);
 
-    useEffect(() => {
-        if (connected) {
-            fetchProducts({ skus: [PRO_PRODUCT_ID], type: 'subs' });
-            // Query Google Play on entry so a purchase completed on another device
-            // or during a previous session can be restored against the signed-in account.
-            getAvailablePurchases();
-        }
-    }, [connected, fetchProducts, getAvailablePurchases]);
-
-    useEffect(() => {
-        if (pendingPurchase) verifyAndFinish(pendingPurchase);
-    }, [pendingPurchase, verifyAndFinish]);
-
-    useEffect(() => {
-        if (!availablePurchases?.length) return;
-        const matching = availablePurchases.find((purchase) =>
-            purchase.productId === PRO_PRODUCT_ID && purchase.purchaseToken
-        );
-        if (matching && user?.plan !== 'PRO') verifyAndFinish(matching);
-    }, [availablePurchases, user?.plan, verifyAndFinish]);
-
-    const handleBuyPro = async () => {
-        if (Platform.OS !== 'android') {
-            Alert.alert('Android only', 'Google Play Billing is configured for the Android version of this app.');
-            return;
-        }
-        if (!connected) {
-            toast.error('Google Play is not available yet. Please try again.');
-            return;
-        }
-        const offers = proSubscription?.subscriptionOfferDetailsAndroid || [];
-        const offer = offers.find((item) => item.offerToken) || offers[0];
-        if (!offer?.offerToken) {
-            toast.error('PRO subscription is not available. Check its activation and base plan in Play Console.');
-            return;
-        }
-        setLoading(true);
+    /**
+     * Step 2: Handle messages coming back from the Razorpay WebView.
+     * On success → verify the signature with the backend.
+     */
+    const handleWebViewMessage = useCallback(async (event) => {
+        let parsed;
         try {
-            await requestPurchase({
-                request: {
-                    google: {
-                        skus: [PRO_PRODUCT_ID],
-                        subscriptionOffers: [{ sku: PRO_PRODUCT_ID, offerToken: offer.offerToken }],
-                    },
-                },
-                type: 'subs',
-            });
-            // Purchase result arrives asynchronously through onPurchaseSuccess.
-        } catch (error) {
-            setLoading(false);
-            handlePurchaseError(error);
-        }
-    };
-
-    const handleRestore = async () => {
-        if (!connected) {
-            toast.error('Google Play is not connected. Please try again.');
+            parsed = JSON.parse(event.nativeEvent.data);
+        } catch {
             return;
         }
-        setRestoring(true);
-        try {
-            await getAvailablePurchases();
-            // availablePurchases updates through the hook; the effect above verifies it.
-            setTimeout(() => setRestoring(false), 2500);
-        } catch (error) {
-            setRestoring(false);
-            toast.error('Unable to restore purchases. Please try again.');
+
+        if (parsed.type === 'PAYMENT_SUCCESS') {
+            if (isVerifying.current) return;
+            isVerifying.current = true;
+            setShowCheckout(false);
+            setLoading(true);
+
+            try {
+                const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = parsed.data;
+
+                const { data: verifyRes } = await api.post('/billing/razorpay/verify-payment', {
+                    razorpay_order_id,
+                    razorpay_payment_id,
+                    razorpay_signature,
+                });
+
+                if (!verifyRes?.success || !verifyRes?.data?.user) {
+                    throw new Error(verifyRes?.message || 'Payment verification pending.');
+                }
+
+                const updatedUser = verifyRes.data.user;
+                await storage.setItem('user', JSON.stringify(updatedUser));
+                setUser(updatedUser);
+                toast.success('PRO activated successfully!');
+                navigation.goBack();
+            } catch (error) {
+                const message = error.response?.data?.message || error.message || 'Could not verify your payment.';
+                toast.error(message);
+            } finally {
+                setLoading(false);
+                isVerifying.current = false;
+            }
+        } else if (parsed.type === 'PAYMENT_FAILED') {
+            setShowCheckout(false);
+            const description = parsed.data?.description || 'Payment failed. Please try again.';
+            toast.error(description);
+        } else if (parsed.type === 'PAYMENT_DISMISSED') {
+            setShowCheckout(false);
+        } else if (parsed.type === 'PAYMENT_ERROR') {
+            setShowCheckout(false);
+            toast.error(parsed.data?.message || 'Could not open payment gateway.');
         }
-    };
+    }, [navigation, setUser]);
 
     const isPro = user?.plan === 'PRO';
-    const priceLabel = proSubscription?.displayPrice || '₹990';
-    const BillingStatus = ({ connected, productsCount }) => {
-        if (!connected) {
-            return (
-                <View style={{
-                    backgroundColor: '#FEF3C7',
-                    padding: 12,
-                    borderRadius: 12,
-                    marginTop: 16,
-                }}>
-                    <Text style={{ color: '#92400E', fontWeight: '700' }}>
-                        ⚠️ Google Play Billing Disconnected
-                    </Text>
+    const priceLabel = '₹999';
 
-                    <Text style={{
-                        color: '#92400E',
-                        fontSize: 12,
-                        marginTop: 5
-                    }}>
-                        Unable to connect to Google Play.
-                        PRO purchases are temporarily unavailable.
-                    </Text>
-                </View>
-            );
-        }
-
-        if (productsCount === 0) {
-            return (
-                <View style={{
-                    backgroundColor: '#FEF3C7',
-                    padding: 12,
-                    borderRadius: 12,
-                    marginTop: 16,
-                }}>
-                    <Text style={{ color: '#92400E', fontWeight: '700' }}>
-                        ⚠️ Subscription Product Not Found
-                    </Text>
-
-                    <Text style={{ color: '#92400E', fontSize: 12 }}>
-                        Billing is connected, but the PRO subscription
-                        could not be loaded.
-                    </Text>
-                </View>
-            );
-    }
-
-        return (
-            <View style={{
-                backgroundColor: '#DCFCE7',
-                padding: 12,
-                borderRadius: 12,
-                marginTop: 16,
-            }}>
-                <Text style={{ color: '#166534', fontWeight: '700' }}>
-                    ✓ Google Play Billing Connected
-                </Text>
-                <Text style={{ color: '#166534', fontSize: 12 }}>
-                    PRO subscription is available.
-                </Text>
-            </View>
-        );
-    };
     return (
         <SafeAreaView style={styles.safe}>
             <ScreenHeader title="Plans & Billing" onBack={() => navigation.goBack()} />
@@ -252,32 +258,17 @@ export default function UpgradePlanScreen({ navigation }) {
                         <FeatureItem text="Add multiple managers" included isProOnly />
                         <FeatureItem text="Real-time risk alerts" included isProOnly />
                     </View>
-                    <BillingStatus
-                        connected={connected}
-                        productsCount={proSubscription ? 1 : 0}
-                    />
+
                     {!isPro ? (
                         <TouchableOpacity
-                            style={[
-                                styles.upgradeBtn,
-                                (!connected || !proSubscription) && {
-                                    backgroundColor: '#9CA3AF',
-                                    opacity: 0.7
-                                }
-                            ]}
+                            style={styles.upgradeBtn}
                             onPress={handleBuyPro}
-                            disabled={loading || !connected || !proSubscription}
+                            disabled={loading}
                         >
                             {loading ? (
                                 <ActivityIndicator color={Colors.white} />
                             ) : (
-                                <Text style={styles.upgradeBtnText}>
-                                    {!connected
-                                        ? 'Billing Unavailable'
-                                        : !proSubscription
-                                            ? 'Subscription Unavailable'
-                                            : 'Subscribe to PRO'}
-                                </Text>
+                                <Text style={styles.upgradeBtnText}>Subscribe to PRO</Text>
                             )}
                         </TouchableOpacity>
                     ) : (
@@ -285,14 +276,6 @@ export default function UpgradePlanScreen({ navigation }) {
                             <Feather name="check" size={16} color={Colors.success} />
                             <Text style={styles.currentPlanText}>Your PRO subscription is active</Text>
                         </View>
-                    )}
-                    <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore} disabled={restoring || loading}>
-                        <Text style={styles.restoreText}>{restoring ? 'Checking purchases…' : 'Restore purchases'}</Text>
-                    </TouchableOpacity>
-                    {isPro && (
-                        <TouchableOpacity style={styles.restoreBtn} onPress={() => Linking.openURL('https://play.google.com/store/account/subscriptions')}>
-                            <Text style={styles.restoreText}>Manage / cancel subscription in Google Play</Text>
-                        </TouchableOpacity>
                     )}
                 </View>
 
@@ -316,9 +299,41 @@ export default function UpgradePlanScreen({ navigation }) {
                 </View>
 
                 <Text style={styles.footerNote}>
-                    Subscription renews yearly through Google Play unless cancelled. Cancellation does not remove access before the paid period expires.
+                    Subscription valid for 1 year from the date of purchase. Renew anytime to extend your PRO access by another year.
                 </Text>
             </ScrollView>
+
+            {/* ── Razorpay Checkout WebView Modal ── */}
+            <Modal
+                visible={showCheckout}
+                animationType="slide"
+                onRequestClose={() => setShowCheckout(false)}
+                transparent={false}
+            >
+                <SafeAreaView style={styles.modalSafe}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowCheckout(false)} style={styles.modalClose}>
+                            <Feather name="x" size={22} color={Colors.textPrimary} />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Complete Payment</Text>
+                        <View style={{ width: 36 }} />
+                    </View>
+                    <WebView
+                        originWhitelist={['*']}
+                        source={{ html: checkoutHTML }}
+                        onMessage={handleWebViewMessage}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        startInLoadingState
+                        renderLoading={() => (
+                            <View style={styles.webviewLoader}>
+                                <ActivityIndicator size="large" color={Colors.primary} />
+                            </View>
+                        )}
+                        style={styles.webview}
+                    />
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -345,10 +360,6 @@ const styles = StyleSheet.create({
     planPrice: { fontSize: 32, fontWeight: '900', color: Colors.textPrimary },
     planPeriod: { fontSize: 14, fontWeight: '600', color: Colors.textMuted },
     priceContainer: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 4 },
-    oldPrice: {
-        fontSize: 16, fontWeight: '700', color: Colors.danger,
-        textDecorationLine: 'line-through', opacity: 0.8
-    },
     proBadge: { backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
     proBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.white },
     proBadgeSmall: { backgroundColor: '#F9731615', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 },
@@ -368,11 +379,22 @@ const styles = StyleSheet.create({
         marginTop: Spacing.xl, backgroundColor: '#ECFDF5', paddingVertical: 10, borderRadius: Radius.md
     },
     logoImage: { width: 60, height: 60 },
-    heading: { fontSize: Font.xl + 2, fontWeight: '800', color: Colors.textPrimary },
-    subText: { fontSize: Font.sm, color: Colors.textSecondary, textAlign: 'center', marginTop: 6, paddingHorizontal: 20, lineHeight: 20 },
-
     currentPlanText: { fontSize: Font.sm, fontWeight: '700', color: Colors.success, marginLeft: 6 },
-    restoreBtn: { alignItems: 'center', paddingTop: 14 },
-    restoreText: { color: Colors.primary, fontSize: Font.sm, fontWeight: '600', textAlign: 'center' },
-    footerNote: { textAlign: 'center', fontSize: 10, color: Colors.textMuted, marginTop: Spacing.md, fontStyle: 'italic' }
+    footerNote: { textAlign: 'center', fontSize: 10, color: Colors.textMuted, marginTop: Spacing.md, fontStyle: 'italic' },
+
+    // Modal / WebView styles
+    modalSafe: { flex: 1, backgroundColor: Colors.bg },
+    modalHeader: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+        borderBottomWidth: 1, borderBottomColor: Colors.separator,
+        backgroundColor: Colors.card,
+    },
+    modalClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    modalTitle: { fontSize: Font.lg, fontWeight: '700', color: Colors.textPrimary },
+    webview: { flex: 1 },
+    webviewLoader: {
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg,
+    },
 });
