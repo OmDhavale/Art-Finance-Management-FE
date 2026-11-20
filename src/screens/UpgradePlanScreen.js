@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ScrollView, ActivityIndicator, Alert, Modal
+    ScrollView, ActivityIndicator, Alert, Modal, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -27,6 +27,31 @@ const FeatureItem = ({ text, included, isProOnly }) => (
         {isProOnly && <View style={styles.proBadgeSmall}><Text style={styles.proBadgeTextSmall}>PRO</Text></View>}
     </View>
 );
+
+/**
+ * Loads Razorpay script on web dynamically if not already loaded.
+ */
+const loadRazorpayScriptWeb = () => {
+    return new Promise((resolve, reject) => {
+        if (typeof window === 'undefined') return reject(new Error('Window not available'));
+        if (window.Razorpay) return resolve(true);
+
+        const existingScript = document.getElementById('razorpay-checkout-js');
+        if (existingScript) {
+            existingScript.onload = () => resolve(true);
+            existingScript.onerror = () => reject(new Error('Razorpay SDK failed to load.'));
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.id = 'razorpay-checkout-js';
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        script.onload = () => resolve(true);
+        script.onerror = () => reject(new Error('Razorpay SDK failed to load.'));
+        document.body.appendChild(script);
+    });
+};
 
 /**
  * Builds the inline HTML page that loads Razorpay Checkout.js
@@ -132,9 +157,41 @@ export default function UpgradePlanScreen({ navigation }) {
     const [checkoutHTML, setCheckoutHTML] = useState('');
     const isVerifying = useRef(false);
 
+    const verifyPayment = useCallback(async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature }) => {
+        if (isVerifying.current) return;
+        isVerifying.current = true;
+        setShowCheckout(false);
+        setLoading(true);
+
+        try {
+            const { data: verifyRes } = await api.post('/billing/razorpay/verify-payment', {
+                razorpay_order_id,
+                razorpay_payment_id,
+                razorpay_signature,
+            });
+
+            if (!verifyRes?.success || !verifyRes?.data?.user) {
+                throw new Error(verifyRes?.message || 'Payment verification pending.');
+            }
+
+            const updatedUser = verifyRes.data.user;
+            await storage.setItem('user', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+            toast.success('PRO activated successfully!');
+            navigation.goBack();
+        } catch (error) {
+            const message = error.response?.data?.message || error.message || 'Could not verify your payment.';
+            toast.error(message);
+        } finally {
+            setLoading(false);
+            isVerifying.current = false;
+        }
+    }, [navigation, setUser]);
+
     /**
-     * Step 1: Call backend to create a Razorpay order, then open the
-     * WebView-based checkout modal with the order details.
+     * Step 1: Call backend to create a Razorpay order, then open checkout:
+     * - On Web: uses window.Razorpay checkout modal natively.
+     * - On Mobile: uses WebView-based modal.
      */
     const handleBuyPro = useCallback(async () => {
         if (isVerifying.current) return;
@@ -146,14 +203,53 @@ export default function UpgradePlanScreen({ navigation }) {
             }
 
             const { orderId, amount, currency, keyId, customer } = res.data;
+            const customerName = customer?.name || user?.name || '';
+            const customerContact = customer?.contact || user?.phone || '';
+
+            if (Platform.OS === 'web') {
+                await loadRazorpayScriptWeb();
+                const options = {
+                    key: keyId,
+                    amount: amount,
+                    currency: currency,
+                    name: 'Artist Finance Management',
+                    description: '1 Year PRO Subscription',
+                    order_id: orderId,
+                    prefill: {
+                        name: customerName,
+                        contact: customerContact,
+                    },
+                    theme: { color: '#F97316' },
+                    handler: function (response) {
+                        verifyPayment({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                        });
+                    },
+                    modal: {
+                        ondismiss: function () {
+                            setLoading(false);
+                        },
+                    },
+                };
+                const rzp = new window.Razorpay(options);
+                rzp.on('payment.failed', function (response) {
+                    toast.error(response?.error?.description || 'Payment failed.');
+                    setLoading(false);
+                });
+                rzp.open();
+                setLoading(false);
+                return;
+            }
 
             const html = buildCheckoutHTML({
                 orderId,
                 keyId,
                 amount,
                 currency,
-                userName: customer?.name || user?.name || '',
-                userContact: customer?.contact || user?.phone || '',
+                userName: customerName,
+                userContact: customerContact,
                 appName: 'Artist Finance Management',
                 description: '1 Year PRO Subscription',
             });
@@ -166,10 +262,10 @@ export default function UpgradePlanScreen({ navigation }) {
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, verifyPayment]);
 
     /**
-     * Step 2: Handle messages coming back from the Razorpay WebView.
+     * Step 2: Handle messages coming back from the Razorpay WebView (Mobile).
      * On success → verify the signature with the backend.
      */
     const handleWebViewMessage = useCallback(async (event) => {
@@ -181,36 +277,8 @@ export default function UpgradePlanScreen({ navigation }) {
         }
 
         if (parsed.type === 'PAYMENT_SUCCESS') {
-            if (isVerifying.current) return;
-            isVerifying.current = true;
-            setShowCheckout(false);
-            setLoading(true);
-
-            try {
-                const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = parsed.data;
-
-                const { data: verifyRes } = await api.post('/billing/razorpay/verify-payment', {
-                    razorpay_order_id,
-                    razorpay_payment_id,
-                    razorpay_signature,
-                });
-
-                if (!verifyRes?.success || !verifyRes?.data?.user) {
-                    throw new Error(verifyRes?.message || 'Payment verification pending.');
-                }
-
-                const updatedUser = verifyRes.data.user;
-                await storage.setItem('user', JSON.stringify(updatedUser));
-                setUser(updatedUser);
-                toast.success('PRO activated successfully!');
-                navigation.goBack();
-            } catch (error) {
-                const message = error.response?.data?.message || error.message || 'Could not verify your payment.';
-                toast.error(message);
-            } finally {
-                setLoading(false);
-                isVerifying.current = false;
-            }
+            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = parsed.data;
+            verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
         } else if (parsed.type === 'PAYMENT_FAILED') {
             setShowCheckout(false);
             const description = parsed.data?.description || 'Payment failed. Please try again.';
@@ -221,7 +289,7 @@ export default function UpgradePlanScreen({ navigation }) {
             setShowCheckout(false);
             toast.error(parsed.data?.message || 'Could not open payment gateway.');
         }
-    }, [navigation, setUser]);
+    }, [verifyPayment]);
 
     const isPro = user?.plan === 'PRO';
     const priceLabel = '₹999';
@@ -303,37 +371,39 @@ export default function UpgradePlanScreen({ navigation }) {
                 </Text>
             </ScrollView>
 
-            {/* ── Razorpay Checkout WebView Modal ── */}
-            <Modal
-                visible={showCheckout}
-                animationType="slide"
-                onRequestClose={() => setShowCheckout(false)}
-                transparent={false}
-            >
-                <SafeAreaView style={styles.modalSafe}>
-                    <View style={styles.modalHeader}>
-                        <TouchableOpacity onPress={() => setShowCheckout(false)} style={styles.modalClose}>
-                            <Feather name="x" size={22} color={Colors.textPrimary} />
-                        </TouchableOpacity>
-                        <Text style={styles.modalTitle}>Complete Payment</Text>
-                        <View style={{ width: 36 }} />
-                    </View>
-                    <WebView
-                        originWhitelist={['*']}
-                        source={{ html: checkoutHTML }}
-                        onMessage={handleWebViewMessage}
-                        javaScriptEnabled
-                        domStorageEnabled
-                        startInLoadingState
-                        renderLoading={() => (
-                            <View style={styles.webviewLoader}>
-                                <ActivityIndicator size="large" color={Colors.primary} />
-                            </View>
-                        )}
-                        style={styles.webview}
-                    />
-                </SafeAreaView>
-            </Modal>
+            {/* ── Razorpay Checkout WebView Modal (Mobile only) ── */}
+            {Platform.OS !== 'web' && (
+                <Modal
+                    visible={showCheckout}
+                    animationType="slide"
+                    onRequestClose={() => setShowCheckout(false)}
+                    transparent={false}
+                >
+                    <SafeAreaView style={styles.modalSafe}>
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity onPress={() => setShowCheckout(false)} style={styles.modalClose}>
+                                <Feather name="x" size={22} color={Colors.textPrimary} />
+                            </TouchableOpacity>
+                            <Text style={styles.modalTitle}>Complete Payment</Text>
+                            <View style={{ width: 36 }} />
+                        </View>
+                        <WebView
+                            originWhitelist={['*']}
+                            source={{ html: checkoutHTML }}
+                            onMessage={handleWebViewMessage}
+                            javaScriptEnabled
+                            domStorageEnabled
+                            startInLoadingState
+                            renderLoading={() => (
+                                <View style={styles.webviewLoader}>
+                                    <ActivityIndicator size="large" color={Colors.primary} />
+                                </View>
+                            )}
+                            style={styles.webview}
+                        />
+                    </SafeAreaView>
+                </Modal>
+            )}
         </SafeAreaView>
     );
 }
