@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView,
-    Animated, StatusBar, Image,
+    Animated, StatusBar, Image, Linking,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Feather } from '@expo/vector-icons';
@@ -27,6 +27,7 @@ export default function LoginScreen({ navigation }) {
     const { login } = useAuth();
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -39,7 +40,17 @@ export default function LoginScreen({ navigation }) {
         ]).start();
     }, []);
 
+    const handleOpenPrivacyPolicy = () => {
+        Linking.openURL('https://bizfolio-fin-manager.netlify.app/privacy-policy').catch(() => {
+            toast.error('Unable to open privacy policy link.');
+        });
+    };
+
     const handleLogin = async () => {
+        if (!agreedToPrivacy) {
+            toast.error('Please agree to the Privacy Policy to continue.');
+            return;
+        }
         if (!phone.trim() || !password.trim()) {
             toast.error('Please enter phone and password.');
             return;
@@ -99,10 +110,36 @@ export default function LoginScreen({ navigation }) {
                         iconName="lock"
                     />
 
+                    {/* Privacy Policy Checkbox */}
+                    <View style={styles.privacyRow}>
+                        <TouchableOpacity
+                            style={[styles.checkbox, agreedToPrivacy && styles.checkboxActive]}
+                            onPress={() => setAgreedToPrivacy(!agreedToPrivacy)}
+                            activeOpacity={0.8}
+                            accessible
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: agreedToPrivacy }}
+                            accessibilityLabel="Agree to privacy policy"
+                        >
+                            {agreedToPrivacy && <Feather name="check" size={14} color={Colors.white} />}
+                        </TouchableOpacity>
+
+                        <Text style={styles.privacyText}>
+                            I have read & agree to the{' '}
+                            <Text
+                                style={styles.privacyLink}
+                                onPress={handleOpenPrivacyPolicy}
+                            >
+                                Privacy Policy
+                            </Text>
+                        </Text>
+                    </View>
+
                     <PrimaryButton
                         title="Login"
                         onPress={handleLogin}
                         loading={loading}
+                        disabled={!agreedToPrivacy}
                         style={styles.btn}
                         iconName="arrow-right"
                     />
@@ -164,6 +201,41 @@ const styles = StyleSheet.create({
     passwordHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     passwordLabel: { fontSize: Font.sm, color: Colors.textPrimary, fontWeight: '600' },
     forgotLink: { fontSize: Font.sm, color: Colors.primary, fontWeight: '600' },
+
+    // Privacy checkbox row
+    privacyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: Spacing.md,
+        marginBottom: Spacing.xs,
+        paddingHorizontal: 2,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: Colors.inputBorder,
+        backgroundColor: Colors.inputBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    checkboxActive: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+    },
+    privacyText: {
+        flex: 1,
+        fontSize: Font.xs + 1,
+        color: Colors.textSecondary,
+        lineHeight: 18,
+    },
+    privacyLink: {
+        color: Colors.primary,
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
 
     btn: { marginTop: Spacing.md },
 

@@ -10,6 +10,8 @@ import { useAuth } from '../context/AuthContext';
 import { Colors, Font, Radius, Spacing, Shadow } from '../theme';
 import { toast } from '../utils/toast';
 import ScreenHeader from '../components/ScreenHeader';
+import AccountDeletionSection from '../components/AccountDeletionSection';
+import AccountDeletionBanner from '../components/AccountDeletionBanner';
 
 export default function WorkshopDetailsScreen({ navigation }) {
     const { user, setUser } = useAuth();
@@ -64,6 +66,8 @@ export default function WorkshopDetailsScreen({ navigation }) {
         <View style={styles.flex}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader title="Workshop Profile" onBack={() => navigation.goBack()} />
+
+            <AccountDeletionBanner navigation={navigation} />
 
             <ScrollView
                 contentContainerStyle={styles.container}
@@ -176,6 +180,20 @@ export default function WorkshopDetailsScreen({ navigation }) {
                             </TouchableOpacity>
                         )}
                         </>
+                    )}
+
+                    {/* Account Deletion Section (Owners only) */}
+                    {isOwner && (
+                        <AccountDeletionSection
+                            onSuccess={(action) => {
+                                if (action === 'requested') {
+                                    toast.warning('Account deletion request submitted. 7-day cooling period started.');
+                                } else if (action === 'cancelled') {
+                                    toast.success('Account deletion request has been cancelled.');
+                                }
+                                fetchWorkshopData(true);
+                            }}
+                        />
                     )}
                 </Animated.View>
             </ScrollView>

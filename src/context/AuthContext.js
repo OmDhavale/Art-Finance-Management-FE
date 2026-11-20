@@ -70,9 +70,40 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    // ─── Account Deletion Helpers ─────────────────────────────────────────────
+
+    /**
+     * Request account deletion (7-day grace period).
+     * Requires password confirmation.
+     */
+    const requestAccountDeletion = async (password) => {
+        const response = await api.post('/users/request-account-deletion', { password });
+        const { deletionRequestedAt, deletionScheduledFor } = response.data.data;
+        const updatedUser = { ...user, deletionRequestedAt, deletionScheduledFor };
+        setUser(updatedUser);
+        await storage.setItem('user', JSON.stringify(updatedUser));
+        return response.data;
+    };
+
+    /**
+     * Cancel pending account deletion.
+     * Clears deletion fields and restores account to normal.
+     */
+    const cancelAccountDeletion = async () => {
+        const response = await api.post('/users/cancel-account-deletion');
+        const updatedUser = { ...user, deletionRequestedAt: null, deletionScheduledFor: null };
+        setUser(updatedUser);
+        await storage.setItem('user', JSON.stringify(updatedUser));
+        return response.data;
+    };
+
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, logout, register, setUser }}>
+        <AuthContext.Provider value={{
+            user, token, loading,
+            login, logout, register, setUser,
+            requestAccountDeletion, cancelAccountDeletion,
+        }}>
             {children}
         </AuthContext.Provider>
     );

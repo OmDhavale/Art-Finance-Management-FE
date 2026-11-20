@@ -12,6 +12,7 @@ import api from '../api/api';
 import { toast } from '../utils/toast';
 import { formatDistanceToNow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import AccountDeletionBanner from '../components/AccountDeletionBanner';
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, iconName, tinted, style, footer }) {
@@ -416,6 +417,9 @@ export default function DashboardScreen({ navigation }) {
                 </View>
                 <Text style={styles.workshopName} numberOfLines={1}>{user?.workshopName || 'My Workshop'}</Text>
             </View>
+
+            {/* Account Deletion Warning Banner */}
+            <AccountDeletionBanner navigation={navigation} />
 
             <ScrollView
                 contentContainerStyle={styles.container}
