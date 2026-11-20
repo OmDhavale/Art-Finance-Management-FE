@@ -35,4 +35,35 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+// Module-level callback registered by AuthProvider to clear session
+let _onAuthLogout = null;
+export function setAuthLogoutHandler(fn) {
+    _onAuthLogout = fn;
+}
+
+// Global response interceptor: intercept 401 Unauthorized / TokenExpired
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const status = error?.response?.status;
+        const msg = error?.response?.data?.message || '';
+
+        // Check if token is expired or access is denied due to invalid/expired token
+        const isAuthError = status === 401;
+        const isLoginOrRegister = error?.config?.url?.includes('/auth/login') || error?.config?.url?.includes('/auth/register');
+
+        // Only auto-logout if it's an authenticated request (not bad credentials during login)
+        if (isAuthError && !isLoginOrRegister) {
+            if (_onAuthLogout) {
+                _onAuthLogout(msg || 'Your session has expired. Please log in again.');
+            } else {
+                await storage.removeItem('token');
+                await storage.removeItem('user');
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 export default api;

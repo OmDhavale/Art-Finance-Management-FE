@@ -67,7 +67,7 @@ export default function WorkshopDetailsScreen({ navigation }) {
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader title="Workshop Profile" onBack={() => navigation.goBack()} />
 
-            <AccountDeletionBanner navigation={navigation} />
+            <AccountDeletionBanner navigation={navigation} onCancelled={() => fetchWorkshopData(true)} />
 
             <ScrollView
                 contentContainerStyle={styles.container}

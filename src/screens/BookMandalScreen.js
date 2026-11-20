@@ -156,10 +156,18 @@ export default function BookMandalScreen({ navigation }) {
     if (step === 1) {
         const cfg = selectedMandal?.latestGrade ? gradeConfig[selectedMandal.latestGrade] : null;
         return (
-            <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
                 <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
                 <ScreenHeader title="Booking Details" onBack={() => setStep(0)} />
-                <ScrollView contentContainerStyle={styles.formContainer} keyboardShouldPersistTaps="handled">
+                <ScrollView
+                    contentContainerStyle={styles.formContainer}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <View style={styles.selectedCard}>
                         <Text style={styles.selectedLabel}>SELECTED MANDAL</Text>
                         <Text style={styles.selectedTitle}>{selectedMandal?.ganpatiTitle}</Text>
@@ -888,7 +896,7 @@ const styles = StyleSheet.create({
     registerLinkText: { fontSize: Font.sm, fontWeight: '700', color: Colors.primary },
 
     // Step 2 — New Booking form (matches "New Booking" mockup)
-    formContainer: { padding: Spacing.xl },
+    formContainer: { flexGrow: 1, padding: Spacing.xl, paddingBottom: 80 },
 
     // Section grouping card (Mandal Details / Murti & Pricing)
     selectedCard: {

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import storage from '../utils/storage';
-import api from '../api/api';
+import api, { setAuthLogoutHandler } from '../api/api';
+import { toast } from '../utils/toast';
 
 
 const AuthContext = createContext(null);
@@ -69,6 +70,15 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         setUser(null);
     };
+
+    // Register 401 interceptor logout callback
+    useEffect(() => {
+        setAuthLogoutHandler(async (message) => {
+            await logout();
+            toast.error(message || 'Session expired. Please login again.', 'Session Expired');
+        });
+        return () => setAuthLogoutHandler(null);
+    }, []);
 
     // ─── Account Deletion Helpers ─────────────────────────────────────────────
 

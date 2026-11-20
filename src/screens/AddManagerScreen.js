@@ -54,12 +54,17 @@ export default function AddManagerScreen({ navigation }) {
     return (
         <KeyboardAvoidingView
             style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader title="Add Manager" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
                 <Animated.View style={[styles.body, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
                     {/* Brand Header */}
@@ -131,7 +136,7 @@ export default function AddManagerScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
-    container: { padding: Spacing.lg, paddingBottom: 40 },
+    container: { flexGrow: 1, padding: Spacing.lg, paddingBottom: 80 },
     body: { flex: 1 },
 
     branding: { alignItems: 'center', marginVertical: Spacing.xl },

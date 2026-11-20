@@ -45,13 +45,18 @@ export default function AddPaymentScreen({ route, navigation }) {
     };
 
     return (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
             <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
             <ScreenHeader title="Add Payment" onBack={() => navigation.goBack()} />
             <Animated.ScrollView
                 style={{ opacity: fadeAnim }}
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
                 {/* Mandal chip */}
                 {mandalName ? (
@@ -141,7 +146,7 @@ export default function AddPaymentScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
-    container: { padding: Spacing.xl, paddingBottom: 48 },
+    container: { flexGrow: 1, padding: Spacing.xl, paddingBottom: 80 },
 
     mandalChipWrap: { alignItems: 'flex-start', marginBottom: Spacing.lg },
     mandalChip: {

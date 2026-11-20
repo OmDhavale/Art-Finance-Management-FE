@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView,
-    Animated, StatusBar, Image, Linking,
+    Animated, StatusBar, Image,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Feather } from '@expo/vector-icons';
@@ -27,7 +27,7 @@ export default function LoginScreen({ navigation }) {
     const { login } = useAuth();
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
-    const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -40,17 +40,7 @@ export default function LoginScreen({ navigation }) {
         ]).start();
     }, []);
 
-    const handleOpenPrivacyPolicy = () => {
-        Linking.openURL('https://bizfolio-fin-manager.netlify.app/privacy-policy').catch(() => {
-            toast.error('Unable to open privacy policy link.');
-        });
-    };
-
     const handleLogin = async () => {
-        if (!agreedToPrivacy) {
-            toast.error('Please agree to the Privacy Policy to continue.');
-            return;
-        }
         if (!phone.trim() || !password.trim()) {
             toast.error('Please enter phone and password.');
             return;
@@ -68,10 +58,15 @@ export default function LoginScreen({ navigation }) {
     return (
         <KeyboardAvoidingView
             style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
             <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
-            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
 
                 {/* Logo + tagline */}
                 <View style={styles.banner}>
@@ -105,41 +100,29 @@ export default function LoginScreen({ navigation }) {
                         value={password}
                         onChangeText={setPassword}
                         placeholder="••••••••"
-                        secureTextEntry
+                        secureTextEntry={!showPassword}
                         autoCapitalize="none"
                         iconName="lock"
-                    />
-
-                    {/* Privacy Policy Checkbox */}
-                    <View style={styles.privacyRow}>
-                        <TouchableOpacity
-                            style={[styles.checkbox, agreedToPrivacy && styles.checkboxActive]}
-                            onPress={() => setAgreedToPrivacy(!agreedToPrivacy)}
-                            activeOpacity={0.8}
-                            accessible
-                            accessibilityRole="checkbox"
-                            accessibilityState={{ checked: agreedToPrivacy }}
-                            accessibilityLabel="Agree to privacy policy"
-                        >
-                            {agreedToPrivacy && <Feather name="check" size={14} color={Colors.white} />}
-                        </TouchableOpacity>
-
-                        <Text style={styles.privacyText}>
-                            I have read & agree to the{' '}
-                            <Text
-                                style={styles.privacyLink}
-                                onPress={handleOpenPrivacyPolicy}
+                        rightElement={
+                            <TouchableOpacity
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeBtn}
+                                accessible
+                                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                             >
-                                Privacy Policy
-                            </Text>
-                        </Text>
-                    </View>
+                                <Feather
+                                    name={showPassword ? "eye" : "eye-off"}
+                                    size={18}
+                                    color={Colors.textMuted}
+                                />
+                            </TouchableOpacity>
+                        }
+                    />
 
                     <PrimaryButton
                         title="Login"
                         onPress={handleLogin}
                         loading={loading}
-                        disabled={!agreedToPrivacy}
                         style={styles.btn}
                         iconName="arrow-right"
                     />
@@ -168,7 +151,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
-    container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Spacing.xl, paddingVertical: 48 },
+    container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Spacing.xl, paddingTop: 40, paddingBottom: 80 },
 
     // Logo
     banner: { alignItems: 'center', marginBottom: Spacing.xxl },
@@ -201,41 +184,7 @@ const styles = StyleSheet.create({
     passwordHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     passwordLabel: { fontSize: Font.sm, color: Colors.textPrimary, fontWeight: '600' },
     forgotLink: { fontSize: Font.sm, color: Colors.primary, fontWeight: '600' },
-
-    // Privacy checkbox row
-    privacyRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: Spacing.md,
-        marginBottom: Spacing.xs,
-        paddingHorizontal: 2,
-    },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 5,
-        borderWidth: 1.5,
-        borderColor: Colors.inputBorder,
-        backgroundColor: Colors.inputBg,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 10,
-    },
-    checkboxActive: {
-        backgroundColor: Colors.primary,
-        borderColor: Colors.primary,
-    },
-    privacyText: {
-        flex: 1,
-        fontSize: Font.xs + 1,
-        color: Colors.textSecondary,
-        lineHeight: 18,
-    },
-    privacyLink: {
-        color: Colors.primary,
-        fontWeight: '700',
-        textDecorationLine: 'underline',
-    },
+    eyeBtn: { padding: 4, marginLeft: 4 },
 
     btn: { marginTop: Spacing.md },
 

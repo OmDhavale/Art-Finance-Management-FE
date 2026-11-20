@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
-    KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar,
+    KeyboardAvoidingView, Platform, ScrollView, Animated, StatusBar, Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'react-native';
@@ -36,10 +36,16 @@ function FeatureChip({ iconName, label }) {
 
 export default function RegisterScreen({ navigation }) {
     const { register } = useAuth();
-    const [form, setForm] = useState({ name: '', workshopName: '', phone: '', password: '', area: '', city: '' });
+    const [form, setForm] = useState({ name: '', workshopName: '', phone: '', password: '', confirmPassword: '', area: '', city: '' });
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
     const [loading, setLoading] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(24)).current;
+
+    const passwordsMismatch = !!form.confirmPassword && form.password !== form.confirmPassword;
+    const passwordsMatch = !!form.confirmPassword && form.password === form.confirmPassword && form.password.length >= 6;
 
     useEffect(() => {
         Animated.parallel([
@@ -50,15 +56,44 @@ export default function RegisterScreen({ navigation }) {
 
     const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
+    const handleOpenPrivacyPolicy = () => {
+        Linking.openURL('https://artist-fin-manager.netlify.app/privacy-policy').catch(() => {
+            toast.error('Unable to open privacy policy link.');
+        });
+    };
+
     const handleRegister = async () => {
-        const { name, workshopName, phone, password } = form;
-        if (!name || !workshopName || !phone || !password) {
-            toast.error('Name, workshop name, phone, and password are required.');
+        if (!agreedToPrivacy) {
+            toast.error('Please agree to the Privacy Policy to continue.');
             return;
         }
+
+        const { name, workshopName, phone, password, confirmPassword } = form;
+        if (!name || !workshopName || !phone || !password || !confirmPassword) {
+            toast.error('All fields including password confirmation are required.');
+            return;
+        }
+
+        if (password.length < 6) {
+            toast.error('Password must be at least 6 characters long.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            toast.error('Passwords do not match. Please re-enter.');
+            return;
+        }
+
         setLoading(true);
         try {
-            await register(form);
+            await register({
+                name: form.name,
+                workshopName: form.workshopName,
+                phone: form.phone,
+                password: form.password,
+                area: form.area,
+                city: form.city,
+            });
         } catch (err) {
             toast.error(err?.response?.data?.message || 'Registration failed.', 'Registration Failed');
         } finally {
@@ -67,9 +102,17 @@ export default function RegisterScreen({ navigation }) {
     };
 
     return (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
             <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
-            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
 
                 <Animated.View style={[styles.body, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
@@ -147,10 +190,88 @@ export default function RegisterScreen({ navigation }) {
                         value={form.password}
                         onChangeText={set('password')}
                         placeholder="Min. 6 characters"
-                        secureTextEntry
+                        secureTextEntry={!showPassword}
                         autoCapitalize="none"
                         iconName="lock"
+                        rightElement={
+                            <TouchableOpacity
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeBtn}
+                                accessible
+                                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                            >
+                                <Feather
+                                    name={showPassword ? "eye" : "eye-off"}
+                                    size={18}
+                                    color={Colors.textMuted}
+                                />
+                            </TouchableOpacity>
+                        }
                     />
+
+                    {/* Confirm Password */}
+                    <View style={styles.labelRow}>
+                        <Text style={styles.fieldLabel}>Confirm Password</Text>
+                        {passwordsMismatch && (
+                            <View style={styles.errorBadge}>
+                                <Feather name="alert-circle" size={12} color={Colors.danger} />
+                                <Text style={styles.errorText}>Passwords do not match</Text>
+                            </View>
+                        )}
+                        {passwordsMatch && (
+                            <View style={styles.matchBadge}>
+                                <Feather name="check-circle" size={12} color={Colors.success} />
+                                <Text style={styles.matchText}>Passwords match</Text>
+                            </View>
+                        )}
+                    </View>
+                    <InputField
+                        value={form.confirmPassword}
+                        onChangeText={set('confirmPassword')}
+                        placeholder="Re-enter password"
+                        secureTextEntry={!showConfirmPassword}
+                        autoCapitalize="none"
+                        iconName={passwordsMismatch ? 'alert-triangle' : passwordsMatch ? 'check-circle' : 'lock'}
+                        rightElement={
+                            <TouchableOpacity
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={styles.eyeBtn}
+                                accessible
+                                accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}
+                            >
+                                <Feather
+                                    name={showConfirmPassword ? "eye" : "eye-off"}
+                                    size={18}
+                                    color={Colors.textMuted}
+                                />
+                            </TouchableOpacity>
+                        }
+                    />
+
+                    {/* Privacy Policy Checkbox */}
+                    <View style={styles.privacyRow}>
+                        <TouchableOpacity
+                            style={[styles.checkbox, agreedToPrivacy && styles.checkboxActive]}
+                            onPress={() => setAgreedToPrivacy(!agreedToPrivacy)}
+                            activeOpacity={0.8}
+                            accessible
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: agreedToPrivacy }}
+                            accessibilityLabel="Agree to privacy policy"
+                        >
+                            {agreedToPrivacy && <Feather name="check" size={14} color={Colors.white} />}
+                        </TouchableOpacity>
+
+                        <Text style={styles.privacyText}>
+                            I have read & agree to the{' '}
+                            <Text
+                                style={styles.privacyLink}
+                                onPress={handleOpenPrivacyPolicy}
+                            >
+                                Privacy Policy
+                            </Text>
+                        </Text>
+                    </View>
 
                     {/* Submit */}
                     <PrimaryButton
@@ -158,6 +279,7 @@ export default function RegisterScreen({ navigation }) {
                         iconName="arrow-right"
                         onPress={handleRegister}
                         loading={loading}
+                        disabled={!agreedToPrivacy}
                         style={styles.btn}
                     />
 
@@ -183,7 +305,7 @@ export default function RegisterScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
-    container: { flexGrow: 1, paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: 40 },
+    container: { flexGrow: 1, paddingHorizontal: Spacing.xl, paddingTop: 40, paddingBottom: 80 },
     body: {},
 
     // Logo
@@ -203,6 +325,42 @@ const styles = StyleSheet.create({
     fieldGap: { height: Spacing.xl },
     fieldGapSm: { height: Spacing.sm },
     fieldLabel: { fontSize: Font.sm, color: Colors.textPrimary, fontWeight: '600', marginBottom: 6 },
+    eyeBtn: { padding: 4, marginLeft: 4 },
+
+    labelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    errorBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: Colors.dangerBg,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: Radius.sm,
+    },
+    errorText: {
+        fontSize: Font.xs,
+        color: Colors.danger,
+        fontWeight: '700',
+    },
+    matchBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: Colors.successBg,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: Radius.sm,
+    },
+    matchText: {
+        fontSize: Font.xs,
+        color: Colors.success,
+        fontWeight: '700',
+    },
 
     // Side-by-side city+area
     rowFields: { flexDirection: 'row', gap: Spacing.md },
@@ -210,6 +368,41 @@ const styles = StyleSheet.create({
     noMargin: { marginBottom: 0 },
 
     btn: { marginTop: Spacing.sm, marginBottom: Spacing.xl },
+
+    // Privacy checkbox row
+    privacyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.md,
+        paddingHorizontal: 2,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: Colors.inputBorder,
+        backgroundColor: Colors.inputBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    checkboxActive: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+    },
+    privacyText: {
+        flex: 1,
+        fontSize: Font.xs + 1,
+        color: Colors.textSecondary,
+        lineHeight: 18,
+    },
+    privacyLink: {
+        color: Colors.primary,
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
 
     // Feature chips
     featureRow: {

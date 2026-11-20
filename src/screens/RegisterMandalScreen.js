@@ -88,11 +88,19 @@ export default function RegisterMandalScreen({ navigation }) {
     };
 
     return (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
             <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
             <ScreenHeader title="Register Mandal" onBack={() => navigation.goBack()} />
 
-            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Logo Section */}
                 <View style={styles.logoRow}>
                     <View style={styles.logoCircle}>
@@ -181,7 +189,7 @@ export default function RegisterMandalScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     flex: { flex: 1, backgroundColor: Colors.bg },
-    container: { paddingHorizontal: Spacing.xl, paddingBottom: 40 },
+    container: { flexGrow: 1, paddingHorizontal: Spacing.xl, paddingBottom: 80 },
 
     logoRow: { alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.lg },
     logoCircle: {

@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Font, Spacing, Radius, Shadow } from '../theme';
+import { toast } from '../utils/toast';
 
 /**
  * AccountDeletionBanner
  *
- * Warning banner displayed cleanly below the screen header or top bar when an owner
- * has requested account deletion (7-day grace period).
- *
- * Shows countdown + warning message + Cancel button that navigates to WorkshopDetails.
+ * Warning banner displayed when an owner has requested account deletion (7-day grace period).
+ * Clicking "Cancel Deletion" directly prompts a confirmation dialog and cancels the request immediately.
  */
-export default function AccountDeletionBanner({ navigation, style }) {
-    const { user } = useAuth();
+export default function AccountDeletionBanner({ navigation, style, onCancelled }) {
+    const { user, cancelAccountDeletion } = useAuth();
     const [timeLeft, setTimeLeft] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
 
     useEffect(() => {
         if (!user?.deletionScheduledFor) {
@@ -64,6 +64,31 @@ export default function AccountDeletionBanner({ navigation, style }) {
         );
     }
 
+    const handleCancel = () => {
+        Alert.alert(
+            'Cancel Account Deletion',
+            'Are you sure you want to cancel the deletion request? Your account and all data will be kept.',
+            [
+                { text: 'Keep Deletion', style: 'cancel' },
+                {
+                    text: 'Yes, Keep Account',
+                    onPress: async () => {
+                        setCancelling(true);
+                        try {
+                            await cancelAccountDeletion();
+                            toast.success('Account deletion request has been cancelled! Your account is normal again.');
+                            onCancelled?.();
+                        } catch (err) {
+                            toast.error(err?.response?.data?.message || 'Failed to cancel account deletion.');
+                        } finally {
+                            setCancelling(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const timeText = timeLeft.days > 0
         ? `${timeLeft.days}d ${timeLeft.hours}h`
         : `${timeLeft.hours} hours`;
@@ -89,15 +114,18 @@ export default function AccountDeletionBanner({ navigation, style }) {
 
             <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => {
-                    if (navigation) {
-                        navigation.navigate('WorkshopDetails');
-                    }
-                }}
+                onPress={handleCancel}
+                disabled={cancelling}
                 activeOpacity={0.8}
             >
-                <Feather name="rotate-ccw" size={14} color={Colors.white} />
-                <Text style={styles.cancelButtonText}>Cancel Deletion Request</Text>
+                {cancelling ? (
+                    <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                    <>
+                        <Feather name="rotate-ccw" size={14} color={Colors.white} />
+                        <Text style={styles.cancelButtonText}>Cancel Deletion Request</Text>
+                    </>
+                )}
             </TouchableOpacity>
         </View>
     );
